@@ -1,0 +1,22 @@
+:root {
+  --color-primary-1: #f6faeb;
+  --color-primary-2: #fff6f0;
+  --color-primary-3: #f4fbf7;
+  --color-primary-4: #fff9eb;
+
+  --font-font-1: Inter;
+  --font-font-2: Inter;
+  --font-font-3: graphik;
+  --font-font-4: Shantell Sans;
+
+  --size-1: 16px;
+  --size-2: 15.5px;
+  --size-3: 14.5px;
+  --size-4: 17px;
+  --size-5: 38px;
+  --size-6: 18px;
+  --size-7: 31px;
+  --size-8: 12px;
+  --size-9: 13.5px;
+  --size-10: 18.5px;
+}

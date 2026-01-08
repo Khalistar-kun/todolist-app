@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(npm install)",
+      "Bash(ipconfig:*)",
+      "Bash(findstr:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(del d:todolisttodolisttemp_schema.json)",
+      "Bash(npx supabase gen types:*)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(timeout /t 8 /nobreak)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "Bash(netstat:*)",
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(tasklist /FI \"IMAGENAME eq node.exe\" /FO CSV)",
+      "Bash(if exist \"d:\\\\todolist\\\\todolist\\\\.next\" rmdir /s /q \"d:\\\\todolist\\\\todolist\\\\.next\")",
+      "Bash(powershell -Command:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(gh auth status:*)",
+      "Bash(gh auth login:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)"
+    ]
+  }
+}

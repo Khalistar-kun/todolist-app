@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "nodemailer": "^6.9.8",
+    "google-auth-library": "^9.5.0",
+    "googleapis": "^129.0.0",
+    "zod": "^3.22.4"
+  }
+}

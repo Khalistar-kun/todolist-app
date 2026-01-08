@@ -1,0 +1,29 @@
+{
+  "colors": {
+    "primary-1": "#f6faeb",
+    "primary-2": "#fff6f0",
+    "primary-3": "#f4fbf7",
+    "primary-4": "#fff9eb"
+  },
+  "typography": {
+    "fontFamilies": {
+      "font-1": "Inter",
+      "font-2": "Inter",
+      "font-3": "graphik",
+      "font-4": "Shantell Sans"
+    },
+    "fontSizes": {
+      "size-1": "16px",
+      "size-2": "15.5px",
+      "size-3": "14.5px",
+      "size-4": "17px",
+      "size-5": "38px",
+      "size-6": "18px",
+      "size-7": "31px",
+      "size-8": "12px",
+      "size-9": "13.5px",
+      "size-10": "18.5px"
+    }
+  },
+  "spacing": {}
+}

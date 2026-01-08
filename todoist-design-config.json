@@ -1,0 +1,35 @@
+{
+  "sites": [
+    {
+      "name": "Homepage",
+      "url": "https://www.todoist.com/",
+      "page_type": "landing"
+    },
+    {
+      "name": "Templates",
+      "url": "https://www.todoist.com/templates",
+      "page_type": "templates"
+    },
+    {
+      "name": "Pricing",
+      "url": "https://www.todoist.com/pricing",
+      "page_type": "pricing"
+    },
+    {
+      "name": "Integrations",
+      "url": "https://www.todoist.com/integrations",
+      "page_type": "integrations"
+    },
+    {
+      "name": "Task Management",
+      "url": "https://www.todoist.com/task-management",
+      "page_type": "feature"
+    },
+    {
+      "name": "Downloads",
+      "url": "https://www.todoist.com/downloads",
+      "page_type": "downloads"
+    }
+  ],
+  "output_dir": "./design-analysis"
+}
