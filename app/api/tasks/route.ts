@@ -20,6 +20,9 @@ async function sendSlackNotification(
 
     if (!slackIntegration) return // No Slack integration configured
 
+    // Check if we have access token (new method) or webhook URL (legacy)
+    if (!slackIntegration.access_token && !slackIntegration.webhook_url) return
+
     // Check if this notification type is enabled
     const typeMap: Record<string, string> = {
       create: 'notify_on_task_create',
@@ -31,20 +34,45 @@ async function sendSlackNotification(
 
     if (!slackIntegration[typeMap[notificationType]]) return // Notification type disabled
 
-    // Send to Slack webhook
-    const response = await fetch(slackIntegration.webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: message.text,
-        blocks: message.blocks,
-      }),
-    })
+    let response: Response
 
-    if (!response.ok) {
-      console.error('[Slack] Failed to send notification:', await response.text())
-    } else {
-      console.log('[Slack] Notification sent successfully')
+    // Use access token method (chat.postMessage API) if available
+    if (slackIntegration.access_token && slackIntegration.channel_id) {
+      response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${slackIntegration.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channel: slackIntegration.channel_id,
+          text: message.text,
+          blocks: message.blocks,
+        }),
+      })
+
+      const result = await response.json()
+      if (!result.ok) {
+        console.error('[Slack] Failed to send notification:', result.error)
+      } else {
+        console.log('[Slack] Notification sent successfully via API')
+      }
+    } else if (slackIntegration.webhook_url) {
+      // Fallback to webhook method (legacy)
+      response = await fetch(slackIntegration.webhook_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: message.text,
+          blocks: message.blocks,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error('[Slack] Failed to send notification:', await response.text())
+      } else {
+        console.log('[Slack] Notification sent successfully via webhook')
+      }
     }
   } catch (error) {
     console.error('[Slack] Error sending notification:', error)
