@@ -661,6 +661,56 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
           </div>
         </div>
       </div>
+
+      {/* Slash Commands Card - Only show when connected */}
+      {integration && (
+        <div className="card">
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Slash Commands (Optional)</h4>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Create tasks directly from Slack! Set up a slash command to use <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">/todolist create Buy groceries</code>
+            </p>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Setup Instructions:</h5>
+                <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
+                  <li>Go to your Slack app settings at <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">api.slack.com/apps</a></li>
+                  <li>Click on <span className="font-medium text-gray-900 dark:text-white">Slash Commands</span> in the sidebar</li>
+                  <li>Click <span className="font-medium text-gray-900 dark:text-white">Create New Command</span></li>
+                  <li>Set the command to <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">/todolist</code></li>
+                  <li>Set the Request URL to:</li>
+                </ol>
+                <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-900 rounded font-mono text-xs break-all">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/api/slack/commands` : '/api/slack/commands'}
+                </div>
+                <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside mt-2" start={6}>
+                  <li>Add a description like "Create and manage tasks"</li>
+                  <li>Click <span className="font-medium text-gray-900 dark:text-white">Save</span></li>
+                </ol>
+              </div>
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h5 className="font-medium text-blue-800 dark:text-blue-300 mb-2">Available Commands:</h5>
+                <ul className="text-sm text-blue-700 dark:text-blue-400 space-y-1">
+                  <li><code className="bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">/todolist create &lt;title&gt;</code> - Create a new task</li>
+                  <li><code className="bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">/todolist list</code> - Show recent tasks</li>
+                  <li><code className="bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">/todolist todo</code> - Show To Do tasks</li>
+                  <li><code className="bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">/todolist doing</code> - Show In Progress tasks</li>
+                  <li><code className="bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">/todolist done</code> - Show completed tasks</li>
+                  <li><code className="bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">/todolist help</code> - Show help</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
