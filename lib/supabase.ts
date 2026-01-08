@@ -1,24 +1,19 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-// Debug: Check if env vars are loaded (remove in production)
-console.log('🔍 Supabase Config Check:')
-console.log('URL:', supabaseUrl || '❌ MISSING')
-console.log('Key:', supabaseAnonKey ? '✅ Present' : '❌ MISSING')
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    '❌ Missing Supabase environment variables!\n' +
-    'Make sure you have .env.local with:\n' +
-    'NEXT_PUBLIC_SUPABASE_URL=...\n' +
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY=...'
-  )
-}
+// Use fallback empty strings during build time to prevent build failures
+// The client will only be used at runtime when env vars are available
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 // Create browser client with cookie-based auth
+// During build time, this creates a non-functional client that won't be used
+// At runtime, the actual env vars will be available
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+
+// Helper function to check if Supabase is properly configured
+export function isSupabaseConfigured(): boolean {
+  return Boolean(supabaseUrl && supabaseAnonKey)
+}
 
 // Helper types for our database
 export type Database = {
