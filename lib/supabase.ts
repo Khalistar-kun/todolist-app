@@ -1,18 +1,22 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-// Use fallback empty strings during build time to prevent build failures
-// The client will only be used at runtime when env vars are available
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// Use placeholder values during build time to prevent @supabase/ssr validation errors
+// These placeholders pass URL validation but won't be used at build time
+// At runtime, the actual env vars will be available
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key-for-build-time-only'
 
 // Create browser client with cookie-based auth
-// During build time, this creates a non-functional client that won't be used
-// At runtime, the actual env vars will be available
+// During build time, this creates a non-functional client with placeholder values
+// At runtime, the actual env vars will be available and the client will work correctly
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
 
-// Helper function to check if Supabase is properly configured
+// Helper function to check if Supabase is properly configured (not using placeholders)
 export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabaseAnonKey)
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
 }
 
 // Helper types for our database
