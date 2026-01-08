@@ -190,6 +190,9 @@ export async function POST(
           case 'token_revoked':
             errorMessage += 'Access token has been revoked. Please generate a new token.'
             break
+          case 'missing_scope':
+            errorMessage += 'Missing required permissions. Please add "chat:write" scope to your Slack app and reinstall it to your workspace.'
+            break
           default:
             errorMessage += testResult.error || 'Please check your settings.'
         }
