@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { getOrgSlackConfig, notifyOrgMemberJoined, notifyOrgMemberLeft } from '@/lib/org-slack'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -180,9 +181,130 @@ export async function POST(
         })
     }
 
+    // Send Slack notification if configured
+    const slackConfig = await getOrgSlackConfig(supabaseAdmin, organizationId)
+    if (slackConfig) {
+      await notifyOrgMemberJoined(
+        slackConfig,
+        orgName,
+        invitedName,
+        invitedProfile?.email || email,
+        memberRole,
+        inviterName
+      )
+    }
+
     return NextResponse.json({ member: newMember }, { status: 201 })
   } catch (error) {
     console.error('[API] Error in POST /api/organizations/[id]/members:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// DELETE - Remove member from organization
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: organizationId } = await params
+    const cookieStore = await cookies()
+    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const url = new URL(request.url)
+    const memberId = url.searchParams.get('memberId')
+
+    if (!memberId) {
+      return NextResponse.json({ error: 'Member ID is required' }, { status: 400 })
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Check if user is admin/owner
+    const { data: membership } = await supabaseAdmin
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return NextResponse.json({ error: 'Only admins can remove members' }, { status: 403 })
+    }
+
+    // Get the member to be removed
+    const { data: memberToRemove } = await supabaseAdmin
+      .from('organization_members')
+      .select('user_id, role')
+      .eq('id', memberId)
+      .eq('organization_id', organizationId)
+      .single()
+
+    if (!memberToRemove) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    // Prevent removing the owner
+    if (memberToRemove.role === 'owner') {
+      return NextResponse.json({ error: 'Cannot remove the organization owner' }, { status: 403 })
+    }
+
+    // Get member's profile before deletion
+    const { data: memberProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', memberToRemove.user_id)
+      .single()
+
+    const memberName = memberProfile?.full_name || memberProfile?.email || 'A member'
+
+    // Get organization name
+    const { data: orgData } = await supabaseAdmin
+      .from('organizations')
+      .select('name')
+      .eq('id', organizationId)
+      .single()
+
+    const orgName = orgData?.name || 'the organization'
+
+    // Get remover's profile
+    const { data: removerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', user.id)
+      .single()
+
+    const removerName = removerProfile?.full_name || removerProfile?.email || 'Someone'
+
+    // Delete the member
+    const { error } = await supabaseAdmin
+      .from('organization_members')
+      .delete()
+      .eq('id', memberId)
+
+    if (error) {
+      console.error('[API] Error removing member:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Send Slack notification if configured
+    const slackConfig = await getOrgSlackConfig(supabaseAdmin, organizationId)
+    if (slackConfig) {
+      await notifyOrgMemberLeft(
+        slackConfig,
+        orgName,
+        memberName,
+        removerName
+      )
+    }
+
+    return NextResponse.json({ success: true, message: 'Member removed successfully' })
+  } catch (error) {
+    console.error('[API] Error in DELETE /api/organizations/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

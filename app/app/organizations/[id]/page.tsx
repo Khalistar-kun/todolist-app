@@ -8,6 +8,7 @@ import { useSound } from '@/hooks/useSound'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
+import { OrganizationSlackIntegration } from '@/components/organizations/OrganizationSlackIntegration'
 
 interface Organization {
   id: string
@@ -60,7 +61,7 @@ export default function OrganizationDetailPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'announcements' | 'meetings' | 'members'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'announcements' | 'meetings' | 'members' | 'settings'>('overview')
 
   // Announcement modal
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
@@ -334,7 +335,7 @@ export default function OrganizationDetailPage() {
         {/* Tabs */}
         <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
           <nav className="flex space-x-8">
-            {(['overview', 'announcements', 'meetings', 'members'] as const).map((tab) => (
+            {(['overview', 'announcements', 'meetings', 'members', 'settings'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => { playClick(); setActiveTab(tab) }}
@@ -617,6 +618,27 @@ export default function OrganizationDetailPage() {
                 ))}
               </ul>
             </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            {canManage ? (
+              <>
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Organization Settings</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Configure integrations and manage your organization</p>
+                </div>
+                <OrganizationSlackIntegration organizationId={organizationId} canManage={canManage} />
+              </>
+            ) : (
+              <div className="card p-12 text-center">
+                <p className="text-gray-500 dark:text-gray-400">
+                  Only organization admins can access settings.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

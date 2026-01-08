@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { getOrgSlackConfig, notifyOrgAnnouncement } from '@/lib/org-slack'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -126,6 +127,18 @@ export async function POST(
       }))
 
       await supabaseAdmin.from('notifications').insert(notifications)
+    }
+
+    // Send Slack notification if configured
+    const slackConfig = await getOrgSlackConfig(supabaseAdmin, organizationId)
+    if (slackConfig) {
+      await notifyOrgAnnouncement(
+        slackConfig,
+        orgName,
+        title.trim(),
+        content.trim(),
+        posterName
+      )
     }
 
     return NextResponse.json({ announcement }, { status: 201 })
