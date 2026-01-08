@@ -72,8 +72,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
       return
     }
 
-    if (!accessToken.startsWith('xoxb-') && !accessToken.startsWith('xoxp-')) {
-      toast.error('Please enter a valid Slack Access Token (starts with xoxb- or xoxp-)')
+    if (!accessToken.startsWith('xoxb-') && !accessToken.startsWith('xoxp-') && !accessToken.startsWith('xoxe.xoxp-')) {
+      toast.error('Please enter a valid Slack Access Token (starts with xoxb-, xoxp-, or xoxe.xoxp-)')
       return
     }
 
@@ -249,7 +249,7 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
                     placeholder="xoxb-your-access-token"
                     className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono text-sm"
                   />
-                  {accessToken && (accessToken.startsWith('xoxb-') || accessToken.startsWith('xoxp-')) && (
+                  {accessToken && (accessToken.startsWith('xoxb-') || accessToken.startsWith('xoxp-') || accessToken.startsWith('xoxe.xoxp-')) && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

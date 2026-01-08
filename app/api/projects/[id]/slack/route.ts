@@ -117,8 +117,8 @@ export async function POST(
       return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 })
     }
 
-    // Validate access token format
-    if (!access_token.startsWith('xoxb-') && !access_token.startsWith('xoxp-')) {
+    // Validate access token format (supports xoxb-, xoxp-, and xoxe.xoxp- formats)
+    if (!access_token.startsWith('xoxb-') && !access_token.startsWith('xoxp-') && !access_token.startsWith('xoxe.xoxp-')) {
       return NextResponse.json({ error: 'Invalid Slack Access Token format' }, { status: 400 })
     }
 
