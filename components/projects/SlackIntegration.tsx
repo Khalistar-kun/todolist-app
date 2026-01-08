@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 interface SlackIntegrationData {
   id: string
   project_id: string
-  webhook_url: string
+  access_token: string | null
+  channel_id: string | null
   channel_name: string | null
   notify_on_task_create: boolean
   notify_on_task_update: boolean
@@ -27,7 +28,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
   const [isEditing, setIsEditing] = useState(false)
 
   // Form state
-  const [webhookUrl, setWebhookUrl] = useState('')
+  const [accessToken, setAccessToken] = useState('')
+  const [channelId, setChannelId] = useState('')
   const [channelName, setChannelName] = useState('')
   const [notifyOnCreate, setNotifyOnCreate] = useState(true)
   const [notifyOnUpdate, setNotifyOnUpdate] = useState(true)
@@ -43,7 +45,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
         const data = await response.json()
         if (data.integration) {
           setIntegration(data.integration)
-          setWebhookUrl(data.integration.webhook_url)
+          setAccessToken(data.integration.access_token || '')
+          setChannelId(data.integration.channel_id || '')
           setChannelName(data.integration.channel_name || '')
           setNotifyOnCreate(data.integration.notify_on_task_create)
           setNotifyOnUpdate(data.integration.notify_on_task_update)
@@ -64,13 +67,18 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
   }, [fetchIntegration])
 
   const handleSave = async () => {
-    if (!webhookUrl.trim()) {
-      toast.error('Webhook URL is required')
+    if (!accessToken.trim()) {
+      toast.error('Access Token is required')
       return
     }
 
-    if (!webhookUrl.startsWith('https://hooks.slack.com/')) {
-      toast.error('Please enter a valid Slack webhook URL')
+    if (!accessToken.startsWith('xoxb-') && !accessToken.startsWith('xoxp-')) {
+      toast.error('Please enter a valid Slack Access Token (starts with xoxb- or xoxp-)')
+      return
+    }
+
+    if (!channelId.trim()) {
+      toast.error('Channel ID is required')
       return
     }
 
@@ -80,7 +88,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          webhook_url: webhookUrl,
+          access_token: accessToken,
+          channel_id: channelId,
           channel_name: channelName || null,
           notify_on_task_create: notifyOnCreate,
           notify_on_task_update: notifyOnUpdate,
@@ -123,7 +132,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
       }
 
       setIntegration(null)
-      setWebhookUrl('')
+      setAccessToken('')
+      setChannelId('')
       setChannelName('')
       setNotifyOnCreate(true)
       setNotifyOnUpdate(true)
@@ -140,7 +150,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
 
   const handleCancel = () => {
     if (integration) {
-      setWebhookUrl(integration.webhook_url)
+      setAccessToken(integration.access_token || '')
+      setChannelId(integration.channel_id || '')
       setChannelName(integration.channel_name || '')
       setNotifyOnCreate(integration.notify_on_task_create)
       setNotifyOnUpdate(integration.notify_on_task_update)
@@ -148,7 +159,8 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
       setNotifyOnMove(integration.notify_on_task_move)
       setNotifyOnComplete(integration.notify_on_task_complete)
     } else {
-      setWebhookUrl('')
+      setAccessToken('')
+      setChannelId('')
       setChannelName('')
     }
     setIsEditing(false)
@@ -221,23 +233,23 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
               {/* Quick start banner */}
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Need a webhook URL? Follow the step-by-step guide below to create one in Slack.
+                  Paste your Slack Access Token below. Follow the step-by-step guide to get your token.
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Webhook URL <span className="text-red-500">*</span>
+                  Access Token <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
-                    type="url"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                    placeholder="https://hooks.slack.com/services/T00000000/B00000000/XXXX..."
+                    type="password"
+                    value={accessToken}
+                    onChange={(e) => setAccessToken(e.target.value)}
+                    placeholder="xoxb-your-access-token"
                     className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono text-sm"
                   />
-                  {webhookUrl && webhookUrl.startsWith('https://hooks.slack.com/') && (
+                  {accessToken && (accessToken.startsWith('xoxb-') || accessToken.startsWith('xoxp-')) && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -246,7 +258,23 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  Paste the webhook URL you copied from Slack
+                  Paste the Access Token you copied from Slack (starts with xoxb- or xoxp-)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Channel ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={channelId}
+                  onChange={(e) => setChannelId(e.target.value)}
+                  placeholder="C0123456789"
+                  className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono text-sm"
+                />
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  Right-click on a channel in Slack, select "View channel details", then copy the Channel ID at the bottom
                 </p>
               </div>
 
@@ -345,7 +373,7 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !webhookUrl.trim()}
+                  disabled={saving || !accessToken.trim() || !channelId.trim()}
                   className="btn btn-md btn-primary"
                 >
                   {saving ? (
@@ -364,14 +392,17 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Webhook URL</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 font-mono truncate max-w-md">
-                    {integration?.webhook_url.replace(/\/[^/]+$/, '/****')}
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Access Token</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                    ****{integration?.access_token?.slice(-8) || '****'}
                   </p>
                 </div>
-                {integration?.channel_name && (
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{integration.channel_name}</span>
-                )}
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Channel</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {integration?.channel_name || integration?.channel_id || 'Not specified'}
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -438,7 +469,7 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
               <div className="flex-1">
                 <h5 className="font-medium text-gray-900 dark:text-white mb-2">Open Slack API Apps page</h5>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Click the button below to open the Slack API page where you'll create your webhook.
+                  Click the button below to open the Slack API page where you'll create your app.
                 </p>
                 <a
                   href="https://api.slack.com/apps"
@@ -498,22 +529,26 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
                 3
               </div>
               <div className="flex-1">
-                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Enable Incoming Webhooks</h5>
+                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Add Bot Permissions</h5>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                   In your new app's settings:
                 </p>
                 <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 ml-4">
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">•</span>
-                    <span>Click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Incoming Webhooks</span> in the left sidebar</span>
+                    <span>Click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">OAuth & Permissions</span> in the left sidebar</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">•</span>
-                    <span>Toggle the switch to <span className="font-medium text-green-600 dark:text-green-400">On</span></span>
+                    <span>Scroll to <span className="font-medium text-gray-900 dark:text-white">Bot Token Scopes</span></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">•</span>
-                    <span>Scroll down and click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Add New Webhook to Workspace</span></span>
+                    <span>Click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Add an OAuth Scope</span></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    <span>Add these scopes: <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">chat:write</code> and <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">chat:write.public</code></span>
                   </li>
                 </ul>
               </div>
@@ -527,14 +562,14 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
                 4
               </div>
               <div className="flex-1">
-                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Choose a channel and authorize</h5>
+                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Install App to Workspace</h5>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  In the popup window:
+                  Still on the OAuth & Permissions page:
                 </p>
                 <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 ml-4">
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">•</span>
-                    <span>Select the channel where you want to receive notifications</span>
+                    <span>Scroll up and click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Install to Workspace</span></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">•</span>
@@ -552,16 +587,45 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
                 5
               </div>
               <div className="flex-1">
-                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Copy your Webhook URL</h5>
+                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Copy your Access Token</h5>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  You'll see your new webhook URL on the page. It looks like:
+                  After installation, you'll see your Bot User OAuth Token. It looks like:
                 </p>
                 <code className="block text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-3 rounded-lg mb-3 overflow-x-auto">
-                  https://hooks.slack.com/services/TXXXXX/BXXXXX/your-webhook-token
+                  xoxb-your-access-token-here
                 </code>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Copy</span> and paste it in the Webhook URL field above!
+                  Click <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Copy</span> and paste it in the Access Token field above!
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 6 - Get Channel ID */}
+          <div className="mb-2 mt-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center font-semibold text-sm">
+                6
+              </div>
+              <div className="flex-1">
+                <h5 className="font-medium text-gray-900 dark:text-white mb-2">Get Channel ID</h5>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  In Slack, find the channel where you want notifications:
+                </p>
+                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5 ml-4">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    <span>Right-click the channel name</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    <span>Select <span className="font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">View channel details</span></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    <span>Scroll to the bottom and copy the <span className="font-medium text-gray-900 dark:text-white">Channel ID</span> (starts with C)</span>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
@@ -586,7 +650,7 @@ export function SlackIntegration({ projectId, canManage }: SlackIntegrationProps
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Need more help?{' '}
               <a
-                href="https://api.slack.com/messaging/webhooks"
+                href="https://api.slack.com/authentication/basics"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 hover:underline"

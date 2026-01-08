@@ -99,7 +99,8 @@ export async function POST(
 
     const body = await request.json()
     const {
-      webhook_url,
+      access_token,
+      channel_id,
       channel_name,
       notify_on_task_create = true,
       notify_on_task_update = true,
@@ -108,13 +109,17 @@ export async function POST(
       notify_on_task_complete = true,
     } = body
 
-    if (!webhook_url) {
-      return NextResponse.json({ error: 'Webhook URL is required' }, { status: 400 })
+    if (!access_token) {
+      return NextResponse.json({ error: 'Access Token is required' }, { status: 400 })
     }
 
-    // Validate webhook URL format
-    if (!webhook_url.startsWith('https://hooks.slack.com/')) {
-      return NextResponse.json({ error: 'Invalid Slack webhook URL' }, { status: 400 })
+    if (!channel_id) {
+      return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 })
+    }
+
+    // Validate access token format
+    if (!access_token.startsWith('xoxb-') && !access_token.startsWith('xoxp-')) {
+      return NextResponse.json({ error: 'Invalid Slack Access Token format' }, { status: 400 })
     }
 
     const supabaseAdmin = getSupabaseAdmin()
@@ -135,12 +140,16 @@ export async function POST(
       return NextResponse.json({ error: 'Only admins and owners can configure Slack integration' }, { status: 403 })
     }
 
-    // Test the webhook before saving
+    // Test the access token by sending a test message via chat.postMessage API
     try {
-      const testResponse = await fetch(webhook_url, {
+      const testResponse = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
+          channel: channel_id,
           text: 'TodoList app connected successfully! You will now receive task notifications in this channel.',
           blocks: [
             {
@@ -162,12 +171,34 @@ export async function POST(
         }),
       })
 
-      if (!testResponse.ok) {
-        return NextResponse.json({ error: 'Failed to verify webhook. Please check the URL.' }, { status: 400 })
+      const testResult = await testResponse.json()
+
+      if (!testResult.ok) {
+        console.error('[API] Slack API error:', testResult.error)
+        let errorMessage = 'Failed to connect to Slack. '
+
+        switch (testResult.error) {
+          case 'channel_not_found':
+            errorMessage += 'Channel not found. Please check the Channel ID.'
+            break
+          case 'not_in_channel':
+            errorMessage += 'Bot is not in the channel. Please invite the bot to the channel first.'
+            break
+          case 'invalid_auth':
+            errorMessage += 'Invalid access token. Please check your token.'
+            break
+          case 'token_revoked':
+            errorMessage += 'Access token has been revoked. Please generate a new token.'
+            break
+          default:
+            errorMessage += testResult.error || 'Please check your settings.'
+        }
+
+        return NextResponse.json({ error: errorMessage }, { status: 400 })
       }
     } catch (testError) {
-      console.error('[API] Webhook test failed:', testError)
-      return NextResponse.json({ error: 'Failed to connect to Slack. Please check the webhook URL.' }, { status: 400 })
+      console.error('[API] Slack test failed:', testError)
+      return NextResponse.json({ error: 'Failed to connect to Slack. Please check your access token.' }, { status: 400 })
     }
 
     // Upsert the integration
@@ -175,7 +206,8 @@ export async function POST(
       .from('slack_integrations')
       .upsert({
         project_id: projectId,
-        webhook_url,
+        access_token,
+        channel_id,
         channel_name: channel_name || null,
         notify_on_task_create,
         notify_on_task_update,

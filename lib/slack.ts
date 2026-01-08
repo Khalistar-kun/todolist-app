@@ -1,19 +1,21 @@
 /**
  * Slack Integration Library
- * Handles sending notifications to Slack webhooks with threading support
+ * Handles sending notifications to Slack using the chat.postMessage API with access tokens
  */
 
 import type { Task, TaskStatus } from './types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type SlackConfig = {
-  webhook_url: string
+  access_token: string
+  channel_id: string
   channel_name?: string | null
 }
 
 export type SlackMessageResponse = {
   ok: boolean
   error?: string
+  ts?: string // Message timestamp from Slack API
 }
 
 export type TaskChangeType = 'created' | 'updated' | 'deleted' | 'status_changed'
@@ -119,16 +121,18 @@ function formatChanges(changes: TaskChanges): string {
 }
 
 /**
- * Send a Slack notification
+ * Send a Slack message using chat.postMessage API
  */
 async function sendSlackMessage(
-  webhookUrl: string,
+  accessToken: string,
+  channelId: string,
   text: string,
   blocks?: any[],
   threadTs?: string
 ): Promise<SlackMessageResponse> {
   try {
     const payload: any = {
+      channel: channelId,
       text,
       blocks: blocks || undefined,
     }
@@ -138,23 +142,23 @@ async function sendSlackMessage(
       payload.thread_ts = threadTs
     }
 
-    const response = await fetch(webhookUrl, {
+    const response = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Slack webhook error:', errorText)
-      return { ok: false, error: errorText }
+    const result = await response.json()
+
+    if (!result.ok) {
+      console.error('Slack API error:', result.error)
+      return { ok: false, error: result.error }
     }
 
-    // Slack webhooks return "ok" for success
-    const result = await response.text()
-    return { ok: result === 'ok' }
+    return { ok: true, ts: result.ts }
   } catch (error) {
     console.error('Failed to send Slack message:', error)
     return { ok: false, error: String(error) }
@@ -187,7 +191,8 @@ export async function notifyTaskCreated(
   ]
 
   return sendSlackMessage(
-    config.webhook_url,
+    config.access_token,
+    config.channel_id,
     `🆕 New task: ${task.title}`,
     blocks
   )
@@ -224,7 +229,8 @@ export async function notifyTaskUpdated(
   ]
 
   return sendSlackMessage(
-    config.webhook_url,
+    config.access_token,
+    config.channel_id,
     `✏️ Task updated: ${task.title}`,
     blocks,
     threadTs
@@ -260,7 +266,8 @@ export async function notifyTaskDeleted(
   ]
 
   return sendSlackMessage(
-    config.webhook_url,
+    config.access_token,
+    config.channel_id,
     `🗑️ Task deleted: ${task.title}`,
     blocks,
     threadTs
@@ -304,7 +311,8 @@ export async function notifyStatusChanged(
   ]
 
   return sendSlackMessage(
-    config.webhook_url,
+    config.access_token,
+    config.channel_id,
     `📋 Task moved to ${newStatus.replace('_', ' ')}: ${task.title}`,
     blocks,
     threadTs
@@ -360,16 +368,17 @@ export async function getSlackConfig(
   try {
     const { data, error } = await supabase
       .from('slack_integrations')
-      .select('webhook_url, channel_name')
+      .select('access_token, channel_id, channel_name')
       .eq('project_id', projectId)
       .single()
 
-    if (error || !data) {
+    if (error || !data || !data.access_token || !data.channel_id) {
       return null
     }
 
     return {
-      webhook_url: data.webhook_url,
+      access_token: data.access_token,
+      channel_id: data.channel_id,
       channel_name: data.channel_name,
     }
   } catch (error) {
@@ -380,18 +389,14 @@ export async function getSlackConfig(
 
 /**
  * Update task with Slack thread information after posting
- * Since we're using webhooks (not the API), we generate a timestamp for threading logic
  */
 export async function updateTaskSlackThread(
   supabase: SupabaseClient,
   taskId: string,
+  messageTs: string,
   isNewThread: boolean = true
 ): Promise<void> {
   try {
-    // Generate timestamp in Slack format (seconds.microseconds)
-    const now = Date.now()
-    const messageTs = `${Math.floor(now / 1000)}.${String(now % 1000).padStart(6, '0')}`
-
     const updates: any = {
       slack_message_ts: messageTs,
     }
