@@ -23,13 +23,32 @@ interface SavedProfile {
   avatar_url: string | null
 }
 
+interface NotificationData {
+  project_id?: string
+  project_name?: string
+  task_id?: string
+  task_title?: string
+  organization_id?: string
+  organization_name?: string
+  meeting_id?: string
+  announcement_id?: string
+  old_stage?: string
+  old_stage_name?: string
+  new_stage?: string
+  new_stage_name?: string
+  moved_by?: string
+  moved_by_name?: string
+  moved_by_role?: string
+}
+
 interface Notification {
   id: string
   title: string
   message: string
   time: string
   read: boolean
-  type: 'info' | 'success' | 'warning'
+  type: string
+  data?: NotificationData
 }
 
 export function AppNavigation() {
@@ -68,8 +87,9 @@ export function AppNavigation() {
           title: n.title,
           message: n.message,
           time: n.created_at,
-          read: n.read,
+          read: n.read || n.is_read || false,
           type: n.type || 'info',
+          data: n.data || undefined,
         }))
         setNotifications(formattedNotifications)
       }
@@ -88,8 +108,9 @@ export function AppNavigation() {
         title: newNotif.title,
         message: newNotif.message,
         time: newNotif.created_at,
-        read: newNotif.read || false,
+        read: newNotif.read || newNotif.is_read || false,
         type: newNotif.type || 'info',
+        data: newNotif.data || undefined,
       }
 
       setNotifications(prev => {
@@ -337,6 +358,92 @@ export function AppNavigation() {
       })
   }
 
+  // Handle notification click - navigate to relevant page
+  const handleNotificationClick = (notification: Notification) => {
+    console.log('[Notification] Click handler:', notification.type, notification.data)
+
+    // Mark as read
+    if (!notification.read) {
+      markAsRead(notification.id)
+    }
+
+    // Close the dropdown
+    setShowNotifications(false)
+
+    // Navigate based on notification type and data
+    const { type, data } = notification
+
+    if (!data) {
+      // No navigation data - just mark as read
+      console.log('[Notification] No data for navigation')
+      return
+    }
+
+    // Handle different notification types
+    switch (type) {
+      case 'task_moved':
+      case 'task_assigned':
+      case 'task_updated':
+      case 'task_created':
+      case 'task_completed':
+      case 'deadline_reminder':
+        // Navigate to the project board (task view)
+        if (data.project_id) {
+          router.push(`/app/projects/${data.project_id}`)
+        }
+        break
+
+      case 'project_invite':
+      case 'project_member_added':
+        // Navigate to the project
+        if (data.project_id) {
+          router.push(`/app/projects/${data.project_id}`)
+        }
+        break
+
+      case 'comment_added':
+        // Navigate to the project where the comment was made
+        if (data.project_id) {
+          router.push(`/app/projects/${data.project_id}`)
+        }
+        break
+
+      case 'organization_invite':
+      case 'organization_member':
+        // Navigate to the organization
+        if (data.organization_id) {
+          router.push(`/app/organizations/${data.organization_id}`)
+        }
+        break
+
+      case 'meeting_scheduled':
+      case 'meeting_reminder':
+        // Navigate to the organization meetings
+        if (data.organization_id) {
+          router.push(`/app/organizations/${data.organization_id}`)
+        }
+        break
+
+      case 'announcement':
+        // Navigate to the organization
+        if (data.organization_id) {
+          router.push(`/app/organizations/${data.organization_id}`)
+        }
+        break
+
+      default:
+        // For unknown types, try to navigate based on available data
+        if (data.project_id) {
+          router.push(`/app/projects/${data.project_id}`)
+        } else if (data.organization_id) {
+          router.push(`/app/organizations/${data.organization_id}`)
+        } else if (data.task_id) {
+          router.push('/app/tasks')
+        }
+        break
+    }
+  }
+
   const unreadCount = notifications.filter(n => !n.read).length
 
   const formatTime = (isoString: string) => {
@@ -452,7 +559,8 @@ export function AppNavigation() {
                       notifications.map((notification) => (
                         <div
                           key={notification.id}
-                          className={`px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${
                             !notification.read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''
                           }`}
                         >
@@ -467,9 +575,19 @@ export function AppNavigation() {
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 {notification.message}
                               </p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                {formatTime(notification.time)}
-                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
+                                  {formatTime(notification.time)}
+                                </p>
+                                {notification.data && (notification.data.project_id || notification.data.organization_id) && (
+                                  <span className="inline-flex items-center text-xs text-blue-500 dark:text-blue-400">
+                                    <svg className="w-3 h-3 mr-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                    </svg>
+                                    View
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-1">
                               {!notification.read && (
