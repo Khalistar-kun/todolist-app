@@ -12,10 +12,19 @@ export function SignUpForm() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  // Honeypot field - bots will fill this, humans won't see it
+  const [website, setWebsite] = useState('')
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Honeypot check - if filled, it's likely a bot
+    if (website) {
+      // Silently reject but show success to confuse bots
+      toast.success('Account created successfully!')
+      return
+    }
 
     if (password !== confirmPassword) {
       toast.error('Passwords do not match')
@@ -62,6 +71,20 @@ export function SignUpForm() {
 
   return (
     <div className="space-y-6">
+      {/* Honeypot field - hidden from humans, bots will fill it */}
+      <div className="absolute -left-[9999px]" aria-hidden="true">
+        <label htmlFor="website">Website</label>
+        <input
+          type="text"
+          id="website"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
+
       <div>
         <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Full name

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -15,6 +16,53 @@ function getSupabaseAdmin() {
 }
 
 /**
+ * Verify Slack request signature to ensure request is from Slack
+ */
+function verifySlackSignature(request: NextRequest, body: string): boolean {
+  const signingSecret = process.env.SLACK_SIGNING_SECRET
+
+  // If no signing secret configured, skip verification (development mode)
+  if (!signingSecret) {
+    console.warn('[Slack Command] No SLACK_SIGNING_SECRET configured - skipping signature verification')
+    return true
+  }
+
+  const timestamp = request.headers.get('x-slack-request-timestamp')
+  const slackSignature = request.headers.get('x-slack-signature')
+
+  if (!timestamp || !slackSignature) {
+    console.error('[Slack Command] Missing signature headers')
+    return false
+  }
+
+  // Check if request is too old (5 minutes)
+  const currentTime = Math.floor(Date.now() / 1000)
+  if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+    console.error('[Slack Command] Request timestamp too old')
+    return false
+  }
+
+  // Create signature base string
+  const sigBasestring = `v0:${timestamp}:${body}`
+
+  // Create HMAC SHA256 hash
+  const mySignature = 'v0=' + crypto
+    .createHmac('sha256', signingSecret)
+    .update(sigBasestring, 'utf8')
+    .digest('hex')
+
+  // Compare signatures using timing-safe comparison
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(mySignature, 'utf8'),
+      Buffer.from(slackSignature, 'utf8')
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
  * Slack Slash Command Handler
  *
  * Handles commands like:
@@ -24,21 +72,24 @@ function getSupabaseAdmin() {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Slack sends data as form-urlencoded
-    const formData = await request.formData()
+    // Read raw body for signature verification
+    const body = await request.text()
 
-    const token = formData.get('token') as string
-    const command = formData.get('command') as string
-    const text = formData.get('text') as string || ''
-    const userId = formData.get('user_id') as string
-    const userName = formData.get('user_name') as string
-    const channelId = formData.get('channel_id') as string
-    const channelName = formData.get('channel_name') as string
-    const responseUrl = formData.get('response_url') as string
+    // Verify the request is from Slack
+    const isValid = verifySlackSignature(request, body)
+    if (!isValid) {
+      console.error('[Slack Command] Invalid signature - request rejected')
+      return NextResponse.json({ error: 'Invalid request signature' }, { status: 401 })
+    }
 
-    // Verify the request is from Slack (optional but recommended)
-    // You should verify using signing secret in production
-    // const signingSecret = process.env.SLACK_SIGNING_SECRET
+    // Parse form data from body
+    const params = new URLSearchParams(body)
+
+    const command = params.get('command') || ''
+    const text = params.get('text') || ''
+    const userId = params.get('user_id') || ''
+    const userName = params.get('user_name') || ''
+    const channelId = params.get('channel_id') || ''
 
     const supabaseAdmin = getSupabaseAdmin()
 
