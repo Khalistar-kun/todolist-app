@@ -67,34 +67,38 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
       }
 
-      // Get project members matching the query
-      let membersQuery = supabaseAdmin
+      // Get project member user_ids (excluding current user)
+      const { data: members, error: membersError } = await supabaseAdmin
         .from('project_members')
-        .select(`
-          user_id,
-          profile:profiles!user_id(
-            id,
-            full_name,
-            email,
-            avatar_url
-          )
-        `)
+        .select('user_id')
         .eq('project_id', projectId)
-        .neq('user_id', user.id) // Exclude current user
-        .limit(limit)
+        .neq('user_id', user.id)
 
-      const { data: members, error } = await membersQuery
-
-      if (error) {
-        console.error('[API] Error fetching project members:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+      if (membersError) {
+        console.error('[API] Error fetching project members:', membersError)
+        return NextResponse.json({ error: membersError.message }, { status: 500 })
       }
 
-      // Filter and format results
-      const users = (members || [])
-        .filter((m) => {
-          if (!m.profile) return false
-          const profile = m.profile as any
+      const memberUserIds = (members || []).map(m => m.user_id)
+
+      if (memberUserIds.length === 0) {
+        return NextResponse.json({ users: [] })
+      }
+
+      // Fetch profiles for these users
+      const { data: profiles, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', memberUserIds)
+
+      if (profilesError) {
+        console.error('[API] Error fetching profiles:', profilesError)
+        return NextResponse.json({ error: profilesError.message }, { status: 500 })
+      }
+
+      // Filter by query and format results
+      const users = (profiles || [])
+        .filter((profile) => {
           if (!query) return true
           const searchLower = query.toLowerCase()
           return (
@@ -102,24 +106,20 @@ export async function GET(request: NextRequest) {
             profile.email?.toLowerCase().includes(searchLower)
           )
         })
-        .map((m) => {
-          const profile = m.profile as any
-          return {
-            id: profile.id,
-            full_name: profile.full_name,
-            email: profile.email,
-            avatar_url: profile.avatar_url,
-            // Generate mention handle from name or email
-            mention_handle: generateMentionHandle(profile.full_name, profile.email),
-          }
-        })
+        .map((profile) => ({
+          id: profile.id,
+          full_name: profile.full_name,
+          email: profile.email,
+          avatar_url: profile.avatar_url,
+          mention_handle: generateMentionHandle(profile.full_name, profile.email),
+        }))
         .slice(0, limit)
 
       return NextResponse.json({ users })
     }
 
     // No project_id - search all users the current user can see
-    // (users in same projects or organizations)
+    // (users in same projects)
 
     // Get all project_ids user is a member of
     const { data: userProjects } = await supabaseAdmin
@@ -133,58 +133,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ users: [] })
     }
 
-    // Get all users in those projects
-    const { data: fellowMembers, error } = await supabaseAdmin
+    // Get all user_ids in those projects (excluding current user)
+    const { data: fellowMembers, error: membersError } = await supabaseAdmin
       .from('project_members')
-      .select(`
-        user_id,
-        profile:profiles!user_id(
-          id,
-          full_name,
-          email,
-          avatar_url
-        )
-      `)
+      .select('user_id')
       .in('project_id', projectIds)
       .neq('user_id', user.id)
 
-    if (error) {
-      console.error('[API] Error fetching fellow members:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (membersError) {
+      console.error('[API] Error fetching fellow members:', membersError)
+      return NextResponse.json({ error: membersError.message }, { status: 500 })
     }
 
-    // Deduplicate and filter
-    const userMap = new Map<string, {
-      id: string
-      full_name: string | null
-      email: string | null
-      avatar_url: string | null
-      mention_handle: string
-    }>()
+    // Get unique user_ids
+    const uniqueUserIds = [...new Set((fellowMembers || []).map(m => m.user_id))]
 
-    for (const m of fellowMembers || []) {
-      if (!m.profile) continue
-      const profile = m.profile as any
-      if (userMap.has(profile.id)) continue
+    if (uniqueUserIds.length === 0) {
+      return NextResponse.json({ users: [] })
+    }
 
-      if (query) {
+    // Fetch profiles for these users
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', uniqueUserIds)
+
+    if (profilesError) {
+      console.error('[API] Error fetching profiles:', profilesError)
+      return NextResponse.json({ error: profilesError.message }, { status: 500 })
+    }
+
+    // Filter by query and format results
+    const users = (profiles || [])
+      .filter((profile) => {
+        if (!query) return true
         const searchLower = query.toLowerCase()
-        const matches =
+        return (
           profile.full_name?.toLowerCase().includes(searchLower) ||
           profile.email?.toLowerCase().includes(searchLower)
-        if (!matches) continue
-      }
-
-      userMap.set(profile.id, {
+        )
+      })
+      .map((profile) => ({
         id: profile.id,
         full_name: profile.full_name,
         email: profile.email,
         avatar_url: profile.avatar_url,
         mention_handle: generateMentionHandle(profile.full_name, profile.email),
-      })
-    }
-
-    const users = Array.from(userMap.values()).slice(0, limit)
+      }))
+      .slice(0, limit)
 
     return NextResponse.json({ users })
   } catch (error) {
