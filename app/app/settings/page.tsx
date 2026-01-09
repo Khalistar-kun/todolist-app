@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useThemeSafe } from '@/contexts/ThemeContext'
+import { OrganizationSlackIntegration } from '@/components/organizations/OrganizationSlackIntegration'
 import toast from 'react-hot-toast'
 
 interface Settings {
@@ -13,6 +14,12 @@ interface Settings {
   task_reminders: boolean
   language: string
   timezone: string
+}
+
+interface Organization {
+  id: string
+  name: string
+  role: string
 }
 
 const defaultSettings: Settings = {
@@ -32,6 +39,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [loaded, setLoaded] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [organization, setOrganization] = useState<Organization | null>(null)
+  const [loadingOrg, setLoadingOrg] = useState(true)
 
   // Load settings from API on mount
   const loadSettings = useCallback(async () => {
@@ -69,11 +78,33 @@ export default function SettingsPage() {
     }
   }, [user])
 
+  // Load user's organization
+  const loadOrganization = useCallback(async () => {
+    if (!user) return
+
+    try {
+      setLoadingOrg(true)
+      const response = await fetch('/api/organizations')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.organizations && data.organizations.length > 0) {
+          // Use the first organization (user's primary org)
+          setOrganization(data.organizations[0])
+        }
+      }
+    } catch (error) {
+      console.error('Error loading organization:', error)
+    } finally {
+      setLoadingOrg(false)
+    }
+  }, [user])
+
   useEffect(() => {
     if (user) {
       loadSettings()
+      loadOrganization()
     }
-  }, [user, loadSettings])
+  }, [user, loadSettings, loadOrganization])
 
   const handleToggle = (key: keyof Settings) => {
     if (typeof settings[key] !== 'boolean') return
@@ -298,6 +329,29 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Slack Integration Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Integrations</h2>
+          {loadingOrg ? (
+            <div className="card p-6">
+              <div className="flex items-center justify-center h-32">
+                <div className="spinner spinner-lg"></div>
+              </div>
+            </div>
+          ) : organization ? (
+            <OrganizationSlackIntegration
+              organizationId={organization.id}
+              canManage={organization.role === 'owner' || organization.role === 'admin'}
+            />
+          ) : (
+            <div className="card p-6">
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                No organization found. Create an organization to configure Slack integration.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Account Section */}

@@ -360,26 +360,55 @@ export function hasSignificantChanges(changes: TaskChanges): boolean {
 
 /**
  * Fetch Slack configuration for a project
+ * First checks project-level config, then falls back to organization-level config
  */
 export async function getSlackConfig(
   supabase: SupabaseClient,
   projectId: string
 ): Promise<SlackConfig | null> {
   try {
-    const { data, error } = await supabase
+    // First, try to get project-level Slack integration
+    const { data: projectConfig, error: projectError } = await supabase
       .from('slack_integrations')
       .select('access_token, channel_id, channel_name')
       .eq('project_id', projectId)
       .single()
 
-    if (error || !data || !data.access_token || !data.channel_id) {
+    if (!projectError && projectConfig?.access_token && projectConfig?.channel_id) {
+      return {
+        access_token: projectConfig.access_token,
+        channel_id: projectConfig.channel_id,
+        channel_name: projectConfig.channel_name,
+      }
+    }
+
+    // Fall back to organization-level Slack integration
+    // First get the project's organization_id
+    const { data: project, error: projFetchError } = await supabase
+      .from('projects')
+      .select('organization_id')
+      .eq('id', projectId)
+      .single()
+
+    if (projFetchError || !project?.organization_id) {
+      return null
+    }
+
+    // Get organization Slack config
+    const { data: orgConfig, error: orgError } = await supabase
+      .from('organization_slack_integrations')
+      .select('access_token, channel_id, channel_name')
+      .eq('organization_id', project.organization_id)
+      .single()
+
+    if (orgError || !orgConfig?.access_token || !orgConfig?.channel_id) {
       return null
     }
 
     return {
-      access_token: data.access_token,
-      channel_id: data.channel_id,
-      channel_name: data.channel_name,
+      access_token: orgConfig.access_token,
+      channel_id: orgConfig.channel_id,
+      channel_name: orgConfig.channel_name,
     }
   } catch (error) {
     console.error('Failed to fetch Slack config:', error)
