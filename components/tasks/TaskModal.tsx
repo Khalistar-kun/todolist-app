@@ -1,10 +1,20 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import type { Project, Task } from '@/lib/supabase'
+import type { Project, Task, Comment } from '@/lib/supabase'
 import { TaskService, type TaskWithDetails } from '@/lib/services/TaskService'
+import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+
+interface CommentWithUser extends Comment {
+  user?: {
+    id: string
+    full_name: string | null
+    email: string | null
+    avatar_url: string | null
+  }
+}
 
 interface TaskModalProps {
   project: Project
@@ -58,8 +68,31 @@ export function TaskModal({
   const [newTag, setNewTag] = useState('')
   const [newLinkUrl, setNewLinkUrl] = useState('')
   const [newLinkLabel, setNewLinkLabel] = useState('')
+  const [comments, setComments] = useState<CommentWithUser[]>([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [addingComment, setAddingComment] = useState(false)
 
   const isEditing = !!task
+
+  // Load comments when switching to comments tab
+  const loadComments = useCallback(async (taskId: string) => {
+    setCommentsLoading(true)
+    try {
+      const taskComments = await TaskService.getTaskComments(taskId)
+      setComments(taskComments as CommentWithUser[])
+    } catch (error) {
+      console.error('Error loading comments:', error)
+    } finally {
+      setCommentsLoading(false)
+    }
+  }, [])
+
+  // Load comments when tab changes to comments
+  useEffect(() => {
+    if (activeTab === 'comments' && taskDetails?.id) {
+      loadComments(taskDetails.id)
+    }
+  }, [activeTab, taskDetails?.id, loadComments])
 
   useEffect(() => {
     if (task && isEditing) {
@@ -140,17 +173,33 @@ export function TaskModal({
   const handleAddComment = async () => {
     if (!newComment.trim() || !taskDetails) return
 
+    setAddingComment(true)
     try {
-      await TaskService.addComment({
-        task_id: taskDetails.id,
-        project_id: project.id,
-        content: newComment.trim(),
+      // Use API endpoint for comments (includes notifications)
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_id: taskDetails.id,
+          project_id: project.id,
+          content: newComment.trim(),
+        }),
       })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to add comment')
+
       setNewComment('')
-      await loadTaskDetails(taskDetails.id)
+      // Refresh comments and task details
+      await Promise.all([
+        loadComments(taskDetails.id),
+        loadTaskDetails(taskDetails.id),
+      ])
       toast.success('Comment added')
     } catch (error: any) {
       toast.error(error.message || 'Failed to add comment')
+    } finally {
+      setAddingComment(false)
     }
   }
 
@@ -600,19 +649,68 @@ export function TaskModal({
                         />
                         <button
                           onClick={handleAddComment}
-                          disabled={!newComment.trim()}
-                          className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white disabled:text-gray-500 dark:disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors"
+                          disabled={!newComment.trim() || addingComment}
+                          className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white disabled:text-gray-500 dark:disabled:text-gray-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                         >
-                          Comment
+                          {addingComment ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                              Adding...
+                            </>
+                          ) : (
+                            'Comment'
+                          )}
                         </button>
                       </div>
 
                       {/* Comments List */}
                       <div className="space-y-3">
-                        {taskDetails.comments_count > 0 ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">Loading comments...</p>
+                        {commentsLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
+                          </div>
+                        ) : comments.length === 0 ? (
+                          <div className="text-center py-6">
+                            <svg className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">No comments yet</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Be the first to comment</p>
+                          </div>
                         ) : (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No comments yet</p>
+                          comments.map((comment) => (
+                            <div key={comment.id} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                              {/* Avatar */}
+                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                {comment.user?.avatar_url ? (
+                                  <img
+                                    src={comment.user.avatar_url}
+                                    alt={comment.user.full_name || 'User'}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                                    {(comment.user?.full_name || comment.user?.email || 'U')[0].toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {comment.user?.full_name || comment.user?.email || 'Unknown'}
+                                  </span>
+                                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                                    {format(new Date(comment.created_at), 'MMM d, yyyy h:mm a')}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap break-words">
+                                  {comment.content}
+                                </p>
+                              </div>
+                            </div>
+                          ))
                         )}
                       </div>
                     </div>
