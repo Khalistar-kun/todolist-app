@@ -1,14 +1,19 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 
+// Maximum time to show loading spinner before showing landing page
+const MAX_LOADING_TIME_MS = 5000
+
 export default function HomePage() {
   const [showDemo, setShowDemo] = useState(false)
+  const [forceShowLanding, setForceShowLanding] = useState(false)
   const { user, loading } = useAuth()
   const router = useRouter()
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Handle OAuth redirect - if code param exists, forward to callback
   useEffect(() => {
@@ -19,13 +24,30 @@ export default function HomePage() {
     }
   }, [router])
 
+  // Set timeout to prevent infinite loading
+  useEffect(() => {
+    if (loading && !forceShowLanding) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.warn('[Home] Loading timeout reached, showing landing page')
+        setForceShowLanding(true)
+      }, MAX_LOADING_TIME_MS)
+    }
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [loading, forceShowLanding])
+
   useEffect(() => {
     if (user && !loading) {
       router.push('/app')
     }
   }, [user, loading, router])
 
-  if (loading) {
+  // Show spinner only if loading, not timed out, and no user
+  if (loading && !forceShowLanding) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -33,8 +55,13 @@ export default function HomePage() {
     )
   }
 
-  if (user) {
-    return null // Will redirect
+  // Redirect in progress
+  if (user && !forceShowLanding) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    )
   }
 
   return (

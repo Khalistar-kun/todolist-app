@@ -20,6 +20,9 @@ interface RecentTask extends Task {
   project: Pick<Project, 'name' | 'color'>
 }
 
+// Maximum time to wait for data before showing empty state
+const DATA_LOADING_TIMEOUT_MS = 15000
+
 export default function Dashboard() {
   const { user, loading } = useAuth()
   const { playClick } = useSound()
@@ -32,7 +35,9 @@ export default function Dashboard() {
   const [recentTasks, setRecentTasks] = useState<RecentTask[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const isInitialLoadRef = useRef(true)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Silent refetch for real-time updates - uses same parallel pattern
   const refetchDataSilently = useCallback(async () => {
@@ -168,12 +173,38 @@ export default function Dashboard() {
   }, [user])
 
   useEffect(() => {
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current)
+    }
+
     if (user) {
+      // Set a timeout to prevent infinite loading
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (dataLoading) {
+          console.warn('[Dashboard] Data loading timed out')
+          setLoadError('Loading is taking longer than expected. Please refresh the page.')
+          setDataLoading(false)
+        }
+      }, DATA_LOADING_TIMEOUT_MS)
+
       fetchDashboardData().then(() => {
         isInitialLoadRef.current = false
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current)
+        }
       })
+    } else if (!loading) {
+      // No user and not loading = definitely not logged in
+      setDataLoading(false)
     }
-  }, [user, fetchDashboardData])
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [user, loading, fetchDashboardData, dataLoading])
 
   if (loading || dataLoading) {
     return (
@@ -222,6 +253,31 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Show error state if loading timed out
+  if (loadError) {
+    return (
+      <div className="text-center py-12 animate-fade-in">
+        <div className="w-16 h-16 mx-auto mb-4 text-yellow-500">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">Loading Issue</h2>
+        <p className="text-gray-500 dark:text-gray-400 mb-6">{loadError}</p>
+        <button
+          onClick={() => {
+            setLoadError(null)
+            setDataLoading(true)
+            fetchDashboardData()
+          }}
+          className="btn btn-md btn-primary hover-lift"
+        >
+          Try Again
+        </button>
       </div>
     )
   }

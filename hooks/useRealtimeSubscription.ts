@@ -23,6 +23,11 @@ interface UseRealtimeSubscriptionOptions {
 /**
  * Hook for subscribing to Supabase real-time changes on database tables
  *
+ * IMPORTANT: This hook properly cleans up subscriptions when:
+ * - Component unmounts
+ * - enabled becomes false (e.g., user logs out)
+ * - subscriptions change
+ *
  * @example
  * useRealtimeSubscription({
  *   subscriptions: [
@@ -42,6 +47,7 @@ export function useRealtimeSubscription({
   enabled = true,
 }: UseRealtimeSubscriptionOptions) {
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const isCleaningUpRef = useRef(false)
   const subscriptionsKey = JSON.stringify(subscriptions)
 
   const handleChange = useCallback(
@@ -64,7 +70,25 @@ export function useRealtimeSubscription({
     [onInsert, onUpdate, onDelete, onChange]
   )
 
+  // Cleanup function that can be called from multiple places
+  const cleanup = useCallback(() => {
+    if (isCleaningUpRef.current) return
+    isCleaningUpRef.current = true
+
+    if (channelRef.current) {
+      const tables = subscriptions.map(s => s.table).join(', ')
+      console.log(`[Realtime] Unsubscribing from ${tables}`)
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+
+    isCleaningUpRef.current = false
+  }, [subscriptions])
+
   useEffect(() => {
+    // Clean up existing channel before creating new one or when disabled
+    cleanup()
+
     if (!enabled || subscriptions.length === 0) {
       return
     }
@@ -99,27 +123,19 @@ export function useRealtimeSubscription({
     // Subscribe to the channel
     channel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') {
-        console.log(`[Realtime] Subscribed to ${subscriptions.map(s => s.table).join(', ')}`, { subscriptions })
+        // Reduce logging noise
       } else if (status === 'CHANNEL_ERROR') {
         console.error('[Realtime] Channel error:', err)
       } else if (status === 'TIMED_OUT') {
         console.error('[Realtime] Subscription timed out')
-      } else {
-        console.log('[Realtime] Status:', status)
       }
     })
 
     channelRef.current = channel
 
     // Cleanup on unmount or when subscriptions change
-    return () => {
-      if (channelRef.current) {
-        console.log(`[Realtime] Unsubscribing from ${subscriptions.map(s => s.table).join(', ')}`)
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
-    }
-  }, [subscriptionsKey, enabled, handleChange])
+    return cleanup
+  }, [subscriptionsKey, enabled, handleChange, cleanup])
 
   // Return function to manually unsubscribe
   return {

@@ -68,18 +68,9 @@ export async function signUp(email: string, password: string, fullName: string) 
 
 export async function signIn(email: string, password: string) {
   try {
-    console.log('[auth-client] signIn called for:', email)
-    console.log('[auth-client] Cookies BEFORE login:', document.cookie)
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
-
-    console.log('[auth-client] signInWithPassword response:', {
-      user: data?.user?.email,
-      session: data?.session ? 'exists' : 'null',
-      error
     })
 
     if (error) throw error
@@ -87,19 +78,9 @@ export async function signIn(email: string, password: string) {
     // Wait a moment for cookies to be set
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    console.log('[auth-client] Cookies AFTER login:', document.cookie)
-
-    // Check all cookies in detail
-    const allCookies = document.cookie.split(';').map(c => c.trim())
-    console.log('[auth-client] All cookies:', allCookies)
-
-    // Verify session is set
-    const { data: sessionData } = await supabase.auth.getSession()
-    console.log('[auth-client] Session after login:', sessionData?.session ? 'Valid session' : 'No session')
-
     return { success: true, data }
   } catch (error: any) {
-    console.error('[auth-client] Sign in error:', error)
+    console.error('[Auth] Sign in error:', error)
     return { success: false, error: error.message }
   }
 }
