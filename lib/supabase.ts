@@ -193,6 +193,7 @@ export type Database = {
           updated_at: string
           tags: string[]
           custom_fields: Record<string, any>
+          color: string | null
         }
         Insert: {
           project_id: string
@@ -206,6 +207,7 @@ export type Database = {
           created_by?: string | null
           tags?: string[]
           custom_fields?: Record<string, any>
+          color?: string | null
         }
         Update: {
           title?: string
@@ -219,6 +221,7 @@ export type Database = {
           updated_by?: string | null
           tags?: string[]
           custom_fields?: Record<string, any>
+          color?: string | null
         }
       }
       task_assignments: {

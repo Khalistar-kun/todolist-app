@@ -29,6 +29,7 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [isCreatingTask, setIsCreatingTask] = useState(false)
+  const [defaultStageId, setDefaultStageId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('board')
 
   const { permissions, loading: permissionsLoading } = useProjectPermissions(projectId)
@@ -108,6 +109,18 @@ export default function ProjectPage() {
       toast.error('You do not have permission to create tasks')
       return
     }
+    setDefaultStageId(null)
+    setIsCreatingTask(true)
+    setShowTaskModal(true)
+  }
+
+  // Handler for adding task from column menu (pre-selects the stage)
+  const handleAddTaskFromColumn = (stageId: string) => {
+    if (!permissions.canEdit) {
+      toast.error('You do not have permission to create tasks')
+      return
+    }
+    setDefaultStageId(stageId)
     setIsCreatingTask(true)
     setShowTaskModal(true)
   }
@@ -285,11 +298,104 @@ export default function ProjectPage() {
     setShowTaskModal(false)
     setSelectedTask(null)
     setIsCreatingTask(false)
+    setDefaultStageId(null)
   }
 
   const handleTaskCreated = () => {
     fetchProjectData() // Refresh tasks
     handleModalClose()
+  }
+
+  // Handler for deleting a task from the card menu
+  const handleTaskDelete = async (task: Task) => {
+    if (!permissions.canEdit) {
+      toast.error('You do not have permission to delete tasks')
+      return
+    }
+
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete "${task.title}"?`)) {
+      return
+    }
+
+    // Optimistic update - remove task from UI immediately
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const newTasks = { ...prev }
+      for (const stageId of Object.keys(newTasks)) {
+        newTasks[stageId] = newTasks[stageId].filter(t => t.id !== task.id)
+      }
+      return newTasks
+    })
+
+    try {
+      await TaskService.deleteTask(task.id)
+      toast.success('Task deleted successfully')
+    } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
+      toast.error(error.message || 'Failed to delete task')
+    }
+  }
+
+  // Handler for duplicating a task
+  const handleTaskDuplicate = async (task: Task) => {
+    if (!permissions.canEdit) {
+      toast.error('You do not have permission to create tasks')
+      return
+    }
+
+    try {
+      const newTask = await TaskService.createTask({
+        project_id: task.project_id,
+        title: `${task.title} (copy)`,
+        description: task.description ?? undefined,
+        priority: task.priority,
+        stage_id: task.stage_id,
+        due_date: task.due_date ?? undefined,
+        tags: task.tags,
+        custom_fields: task.custom_fields,
+      })
+
+      // Add to tasks list
+      setTasks(prev => ({
+        ...prev,
+        [task.stage_id]: [...(prev[task.stage_id] || []), newTask],
+      }))
+
+      toast.success('Task duplicated successfully')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to duplicate task')
+    }
+  }
+
+  // Handler for changing task color
+  const handleTaskColorChange = async (task: Task, color: string | null) => {
+    if (!permissions.canEdit) {
+      toast.error('You do not have permission to edit tasks')
+      return
+    }
+
+    // Optimistic update
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const newTasks = { ...prev }
+      for (const stageId of Object.keys(newTasks)) {
+        newTasks[stageId] = newTasks[stageId].map(t =>
+          t.id === task.id ? { ...t, color } : t
+        )
+      }
+      return newTasks
+    })
+
+    try {
+      await TaskService.updateTask(task.id, { color })
+      toast.success('Task color updated')
+    } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
+      toast.error(error.message || 'Failed to update task color')
+    }
   }
 
   if (loading || permissionsLoading) {
@@ -449,6 +555,10 @@ export default function ProjectPage() {
               onTaskMove={permissions.canEdit ? handleTaskMove : undefined}
               onReorder={permissions.canEdit ? handleReorder : undefined}
               onBulkStatusChange={permissions.canEdit ? handleBulkStatusChange : undefined}
+              onAddTask={permissions.canEdit ? handleAddTaskFromColumn : undefined}
+              onTaskDelete={permissions.canEdit ? handleTaskDelete : undefined}
+              onTaskDuplicate={permissions.canEdit ? handleTaskDuplicate : undefined}
+              onTaskColorChange={permissions.canEdit ? handleTaskColorChange : undefined}
             />
 
             {/* Read-only notice for viewers */}
@@ -489,6 +599,7 @@ export default function ProjectPage() {
             onUpdate={permissions.canEdit ? handleTaskUpdate : undefined}
             onCreate={isCreatingTask && permissions.canEdit ? handleTaskCreated : undefined}
             readOnly={!permissions.canEdit}
+            defaultStageId={defaultStageId}
           />
         )}
       </div>

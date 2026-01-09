@@ -11,6 +11,7 @@ export interface CreateTaskData {
   tags?: string[]
   assignees?: string[]
   custom_fields?: Record<string, any>
+  color?: string | null
 }
 
 export interface UpdateTaskData {
@@ -24,6 +25,7 @@ export interface UpdateTaskData {
   completed_at?: string
   tags?: string[]
   custom_fields?: Record<string, any>
+  color?: string | null
 }
 
 export interface TaskWithDetails extends Task {

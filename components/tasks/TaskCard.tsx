@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task } from '@/lib/supabase'
@@ -14,21 +14,43 @@ interface TaskCardProps {
   onClick: () => void
   onCommentClick?: (task: Task, anchorRect: DOMRect) => void
   onExpandClick?: (task: Task) => void
+  onDelete?: (task: Task) => void
+  onDuplicate?: (task: Task) => void
+  onColorChange?: (task: Task, color: string | null) => void
   isDragging?: boolean
   isSelected?: boolean
   onSelect?: (taskId: string, ctrlKey: boolean) => void
 }
+
+// Preset colors for task color picker
+const TASK_COLORS = [
+  { value: null, label: 'None', color: 'transparent' },
+  { value: '#EF4444', label: 'Red', color: '#EF4444' },
+  { value: '#F97316', label: 'Orange', color: '#F97316' },
+  { value: '#EAB308', label: 'Yellow', color: '#EAB308' },
+  { value: '#22C55E', label: 'Green', color: '#22C55E' },
+  { value: '#3B82F6', label: 'Blue', color: '#3B82F6' },
+  { value: '#8B5CF6', label: 'Purple', color: '#8B5CF6' },
+  { value: '#EC4899', label: 'Pink', color: '#EC4899' },
+]
 
 export function TaskCard({
   task,
   onClick,
   onCommentClick,
   onExpandClick,
+  onDelete,
+  onDuplicate,
+  onColorChange,
   isDragging = false,
   isSelected = false,
   onSelect,
 }: TaskCardProps) {
   const commentButtonRef = useRef<HTMLButtonElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   const {
     attributes,
@@ -75,6 +97,57 @@ export function TaskCard({
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done'
   const isDueSoon = task.due_date && new Date(task.due_date) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) && task.status !== 'done'
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        menuButtonRef.current &&
+        !menuButtonRef.current.contains(e.target as Node)
+      ) {
+        setMenuOpen(false)
+        setShowColorPicker(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
+
+  // Handle menu button click
+  const handleMenuClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenuOpen(!menuOpen)
+    setShowColorPicker(false)
+  }, [menuOpen])
+
+  // Handle delete
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenuOpen(false)
+    onDelete?.(task)
+  }, [task, onDelete])
+
+  // Handle duplicate
+  const handleDuplicate = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenuOpen(false)
+    onDuplicate?.(task)
+  }, [task, onDuplicate])
+
+  // Handle color change
+  const handleColorSelect = useCallback((color: string | null) => {
+    setMenuOpen(false)
+    setShowColorPicker(false)
+    onColorChange?.(task, color)
+  }, [task, onColorChange])
 
   // Main card click - opens task detail
   const handleCardClick = (e: React.MouseEvent) => {
@@ -134,7 +207,7 @@ export function TaskCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group ${
+      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group overflow-hidden ${
         isDragging ? 'opacity-50 rotate-3' : ''
       } ${
         isSelected
@@ -145,6 +218,13 @@ export function TaskCard({
       {...attributes}
       {...listeners}
     >
+      {/* Color indicator stripe */}
+      {task.color && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1"
+          style={{ backgroundColor: task.color }}
+        />
+      )}
       {/* Selection checkbox indicator */}
       {isSelected && (
         <div className="absolute -top-2 -left-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md z-10">
@@ -170,22 +250,131 @@ export function TaskCard({
         </div>
 
         {/* Action Buttons - Always visible on touch devices, hover on desktop */}
-        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity relative">
           {/* More menu button */}
           <button
+            ref={menuButtonRef}
             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              // TODO: Open task menu
-            }}
-            onKeyDown={(e) => handleIconKeyDown(e, () => {})}
+            onClick={handleMenuClick}
+            onKeyDown={(e) => handleIconKeyDown(e, () => setMenuOpen(!menuOpen))}
             title="More options"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
           </button>
+
+          {/* Dropdown Menu */}
+          {menuOpen && (
+            <div
+              ref={menuRef}
+              className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Edit Task */}
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setMenuOpen(false)
+                  onClick()
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+                Edit Task
+              </button>
+
+              {/* Color submenu */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setShowColorPicker(!showColorPicker)
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z" />
+                    </svg>
+                    Set Color
+                  </span>
+                  <svg className={`w-4 h-4 transition-transform ${showColorPicker ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+
+                {/* Color Picker */}
+                {showColorPicker && (
+                  <div className="absolute left-full top-0 ml-1 w-36 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 px-2">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {TASK_COLORS.map((color) => (
+                        <button
+                          key={color.label}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleColorSelect(color.value)
+                          }}
+                          className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
+                            task.color === color.value
+                              ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
+                              : 'border-gray-300 dark:border-gray-600'
+                          } ${color.value === null ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+                          style={color.value ? { backgroundColor: color.value } : undefined}
+                          title={color.label}
+                        >
+                          {color.value === null && (
+                            <svg className="w-full h-full text-gray-400 dark:text-gray-500 p-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                          )}
+                          {task.color === color.value && color.value !== null && (
+                            <svg className="w-full h-full text-white p-1" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Duplicate */}
+              {onDuplicate && (
+                <button
+                  onClick={handleDuplicate}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+                  </svg>
+                  Duplicate
+                </button>
+              )}
+
+              {/* Divider */}
+              {onDelete && <div className="border-t border-gray-200 dark:border-gray-700 my-1" />}
+
+              {/* Delete */}
+              {onDelete && (
+                <button
+                  onClick={handleDelete}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

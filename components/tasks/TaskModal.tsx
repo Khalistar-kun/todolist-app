@@ -26,6 +26,7 @@ interface TaskModalProps {
   onUpdate?: (task: Task) => void
   onCreate?: () => void
   readOnly?: boolean
+  defaultStageId?: string | null
 }
 
 interface TaskLink {
@@ -41,7 +42,20 @@ interface TaskFormData {
   tags: string[]
   stage_id: string
   links: TaskLink[]
+  color: string | null
 }
+
+// Preset colors for task color picker - must match database constraint
+const TASK_COLORS = [
+  { value: null, label: 'Default', color: 'transparent' },
+  { value: '#EF4444', label: 'Red', color: '#EF4444' },
+  { value: '#F97316', label: 'Orange', color: '#F97316' },
+  { value: '#EAB308', label: 'Yellow', color: '#EAB308' },
+  { value: '#22C55E', label: 'Green', color: '#22C55E' },
+  { value: '#3B82F6', label: 'Blue', color: '#3B82F6' },
+  { value: '#8B5CF6', label: 'Purple', color: '#8B5CF6' },
+  { value: '#EC4899', label: 'Pink', color: '#EC4899' },
+]
 
 export function TaskModal({
   project,
@@ -51,6 +65,7 @@ export function TaskModal({
   onUpdate,
   onCreate,
   readOnly = false,
+  defaultStageId,
 }: TaskModalProps) {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'comments' | 'activity'>('details')
@@ -61,8 +76,9 @@ export function TaskModal({
     priority: 'none',
     due_date: '',
     tags: [],
-    stage_id: project.workflow_stages?.[0]?.id || 'todo',
+    stage_id: defaultStageId || project.workflow_stages?.[0]?.id || 'todo',
     links: [],
+    color: null,
   })
 
   const [newComment, setNewComment] = useState('')
@@ -124,6 +140,7 @@ export function TaskModal({
         tags: task.tags || [],
         stage_id: task.stage_id,
         links: existingLinks,
+        color: task.color || null,
       })
     } else {
       // Reset form for new task
@@ -133,12 +150,13 @@ export function TaskModal({
         priority: 'none',
         due_date: '',
         tags: [],
-        stage_id: project.workflow_stages?.[0]?.id || 'todo',
+        stage_id: defaultStageId || project.workflow_stages?.[0]?.id || 'todo',
         links: [],
+        color: null,
       })
       setTaskDetails(null)
     }
-  }, [task, isEditing, project.workflow_stages])
+  }, [task, isEditing, project.workflow_stages, defaultStageId])
 
   const loadTaskDetails = async (taskId: string) => {
     try {
@@ -155,9 +173,10 @@ export function TaskModal({
 
     try {
       // Prepare data with links stored in custom_fields
-      const { links, ...restFormData } = formData
+      const { links, color, ...restFormData } = formData
       const taskData = {
         ...restFormData,
+        color: color, // Include color in task data
         custom_fields: {
           ...(task?.custom_fields || {}),
           links: links.length > 0 ? links : undefined,
@@ -408,6 +427,55 @@ export function TaskModal({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Color Label */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Color Label
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {TASK_COLORS.map((colorOption) => (
+                      <button
+                        key={colorOption.label}
+                        type="button"
+                        onClick={() => !readOnly && setFormData({ ...formData, color: colorOption.value })}
+                        disabled={readOnly}
+                        className={`relative w-8 h-8 rounded-full border-2 transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          formData.color === colorOption.value
+                            ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        } ${colorOption.value === null ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+                        style={colorOption.value ? { backgroundColor: colorOption.value } : undefined}
+                        title={colorOption.label}
+                      >
+                        {/* Default/None indicator */}
+                        {colorOption.value === null && (
+                          <svg className="w-full h-full text-gray-400 dark:text-gray-500 p-1.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        )}
+                        {/* Selected checkmark */}
+                        {formData.color === colorOption.value && colorOption.value !== null && (
+                          <svg className="w-full h-full text-white p-1.5" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Color preview bar */}
+                  {formData.color && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div
+                        className="w-full h-1.5 rounded-full"
+                        style={{ backgroundColor: formData.color }}
+                      />
+                      <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {TASK_COLORS.find(c => c.value === formData.color)?.label}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Tags */}

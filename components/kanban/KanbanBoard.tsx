@@ -35,6 +35,11 @@ interface KanbanBoardProps {
   onReorder?: (stageId: string, taskIds: string[]) => void
   onBulkStatusChange?: (taskIds: string[], newStageId: string) => void
   onBulkDelete?: (taskIds: string[]) => void
+  onAddTask?: (stageId: string) => void
+  onSortColumn?: (stageId: string, sortBy: 'priority' | 'due_date') => void
+  onTaskDelete?: (task: Task) => void
+  onTaskDuplicate?: (task: Task) => void
+  onTaskColorChange?: (task: Task, color: string | null) => void
 }
 
 export function KanbanBoard({
@@ -45,9 +50,84 @@ export function KanbanBoard({
   onReorder,
   onBulkStatusChange,
   onBulkDelete,
+  onAddTask,
+  onSortColumn,
+  onTaskDelete,
+  onTaskDuplicate,
+  onTaskColorChange,
 }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+  const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set())
+  const [localSortedTasks, setLocalSortedTasks] = useState<Record<string, Task[]>>({})
+
+  // Toggle column collapse
+  const handleCollapseColumn = useCallback((stageId: string) => {
+    setCollapsedColumns(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(stageId)) {
+        newSet.delete(stageId)
+      } else {
+        newSet.add(stageId)
+      }
+      return newSet
+    })
+  }, [])
+
+  // Priority order for sorting (lower = higher priority)
+  const PRIORITY_ORDER: Record<string, number> = {
+    urgent: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+    none: 4,
+  }
+
+  // Local sorting handler (frontend-only, immediate feedback)
+  const handleLocalSort = useCallback((stageId: string, sortBy: 'priority' | 'due_date') => {
+    const stageTasks = [...(tasks[stageId] || [])]
+
+    if (sortBy === 'priority') {
+      stageTasks.sort((a, b) => {
+        const aPriority = PRIORITY_ORDER[a.priority] ?? 4
+        const bPriority = PRIORITY_ORDER[b.priority] ?? 4
+        return aPriority - bPriority
+      })
+    } else if (sortBy === 'due_date') {
+      stageTasks.sort((a, b) => {
+        // Tasks without due date go to bottom
+        if (!a.due_date && !b.due_date) return 0
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+      })
+    }
+
+    setLocalSortedTasks(prev => ({
+      ...prev,
+      [stageId]: stageTasks,
+    }))
+
+    // Also persist if handler is provided
+    if (onSortColumn) {
+      onSortColumn(stageId, sortBy)
+    }
+
+    // Persist the new order via reorder handler
+    if (onReorder) {
+      onReorder(stageId, stageTasks.map(t => t.id))
+    }
+  }, [tasks, onSortColumn, onReorder])
+
+  // Get tasks for a stage (use local sorted if available, otherwise props)
+  const getTasksForStage = useCallback((stageId: string): Task[] => {
+    return localSortedTasks[stageId] || tasks[stageId] || []
+  }, [localSortedTasks, tasks])
+
+  // Clear local sort when tasks change
+  useEffect(() => {
+    setLocalSortedTasks({})
+  }, [tasks])
 
   // Quick comment panel state
   const [commentPanel, setCommentPanel] = useState<CommentPanelState>({
@@ -341,12 +421,20 @@ export function KanbanBoard({
             <KanbanColumn
               key={stage.id}
               stage={stage}
-              tasks={tasks[stage.id] || []}
+              tasks={getTasksForStage(stage.id)}
               onTaskClick={onTaskClick}
               onCommentClick={handleCommentClick}
               onExpandClick={handleExpandClick}
+              onTaskDelete={onTaskDelete}
+              onTaskDuplicate={onTaskDuplicate}
+              onTaskColorChange={onTaskColorChange}
               selectedTaskIds={selectedTaskIds}
               onTaskSelect={handleTaskSelect}
+              onAddTask={onAddTask}
+              onSortByPriority={() => handleLocalSort(stage.id, 'priority')}
+              onSortByDueDate={() => handleLocalSort(stage.id, 'due_date')}
+              onCollapse={() => handleCollapseColumn(stage.id)}
+              isCollapsed={collapsedColumns.has(stage.id)}
             />
           ))}
         </div>
