@@ -34,7 +34,7 @@ export default function Dashboard() {
   const [dataLoading, setDataLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
 
-  // Silent refetch for real-time updates
+  // Silent refetch for real-time updates - uses same parallel pattern
   const refetchDataSilently = useCallback(async () => {
     if (!user) return
     try {
@@ -46,33 +46,35 @@ export default function Dashboard() {
       const projectIds = projectMembers?.map(pm => pm.project_id) || []
       if (projectIds.length === 0) return
 
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('*')
-        .in('id', projectIds)
-        .order('updated_at', { ascending: false })
+      const [projectsResult, tasksResult, statsResult] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('*')
+          .in('id', projectIds)
+          .order('updated_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('tasks')
+          .select('*, project:projects(name, color)')
+          .in('project_id', projectIds)
+          .order('updated_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('tasks')
+          .select('status')
+          .in('project_id', projectIds)
+      ])
 
-      setProjects(projectsData || [])
+      setProjects(projectsResult.data || [])
+      setRecentTasks(tasksResult.data as RecentTask[] || [])
 
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select(`*, project:projects(name, color)`)
-        .in('project_id', projectIds)
-        .order('updated_at', { ascending: false })
-        .limit(10)
-
-      const recentTasksData = tasksData as RecentTask[] || []
-      const totalTasks = recentTasksData.length
-      const completedTasks = recentTasksData.filter(task => task.status === 'done').length
-      const activeTasks = recentTasksData.filter(task => task.status !== 'done' && task.status !== 'archived').length
-
+      const allTaskStatuses = statsResult.data || []
       setStats({
-        totalProjects: projectsData?.length || 0,
-        activeTasks,
-        completedTasks,
-        totalTasks,
+        totalProjects: projectIds.length,
+        activeTasks: allTaskStatuses.filter(t => t.status !== 'done' && t.status !== 'archived').length,
+        completedTasks: allTaskStatuses.filter(t => t.status === 'done').length,
+        totalTasks: allTaskStatuses.length,
       })
-      setRecentTasks(recentTasksData)
     } catch (error) {
       console.error('Error refetching dashboard data:', error)
     }
@@ -96,15 +98,14 @@ export default function Dashboard() {
   const fetchDashboardData = useCallback(async () => {
     if (!user) return
     try {
-      // Get user's projects
+      // First get user's project IDs
       const { data: projectMembers, error: memberError } = await supabase
         .from('project_members')
         .select('project_id')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
 
       if (memberError) {
         console.error('Error fetching project members:', memberError)
-        // Don't block - show empty state
         setDataLoading(false)
         return
       }
@@ -116,49 +117,49 @@ export default function Dashboard() {
         return
       }
 
-      // Fetch projects
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('*')
-        .in('id', projectIds)
-        .order('updated_at', { ascending: false })
+      // Fetch projects, recent tasks, and task counts IN PARALLEL
+      const [projectsResult, tasksResult, statsResult] = await Promise.all([
+        // Projects - fetch all fields for type compatibility
+        supabase
+          .from('projects')
+          .select('*')
+          .in('id', projectIds)
+          .order('updated_at', { ascending: false })
+          .limit(5),
 
-      if (projectsError) {
-        console.error('Error fetching projects:', projectsError)
-      }
+        // Recent tasks with project info
+        supabase
+          .from('tasks')
+          .select('*, project:projects(name, color)')
+          .in('project_id', projectIds)
+          .order('updated_at', { ascending: false })
+          .limit(5),
 
-      setProjects(projectsData || [])
+        // Get task counts for stats (separate query for accuracy)
+        supabase
+          .from('tasks')
+          .select('status')
+          .in('project_id', projectIds)
+      ])
 
-      // Fetch tasks
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          project:projects(name, color)
-        `)
-        .in('project_id', projectIds)
-        .order('updated_at', { ascending: false })
-        .limit(10)
+      const projectsData = projectsResult.data || []
+      const tasksData = tasksResult.data as RecentTask[] || []
+      const allTaskStatuses = statsResult.data || []
 
-      if (tasksError) {
-        console.error('Error fetching tasks:', tasksError)
-      }
+      setProjects(projectsData)
+      setRecentTasks(tasksData)
 
-      const recentTasksData = tasksData as RecentTask[] || []
-
-      // Calculate stats
-      const totalTasks = recentTasksData.length
-      const completedTasks = recentTasksData.filter(task => task.status === 'done').length
-      const activeTasks = recentTasksData.filter(task => task.status !== 'done' && task.status !== 'archived').length
+      // Calculate accurate stats from all tasks
+      const totalTasks = allTaskStatuses.length
+      const completedTasks = allTaskStatuses.filter(t => t.status === 'done').length
+      const activeTasks = allTaskStatuses.filter(t => t.status !== 'done' && t.status !== 'archived').length
 
       setStats({
-        totalProjects: projectsData?.length || 0,
+        totalProjects: projectIds.length,
         activeTasks,
         completedTasks,
         totalTasks,
       })
-
-      setRecentTasks(recentTasksData)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     } finally {
@@ -176,10 +177,50 @@ export default function Dashboard() {
 
   if (loading || dataLoading) {
     return (
-      <div className="flex items-center justify-center h-64 animate-fade-in">
-        <div className="flex flex-col items-center gap-3">
-          <div className="spinner spinner-lg"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading your dashboard...</p>
+      <div className="px-4 py-6 sm:px-0 animate-fade-in">
+        <div className="max-w-7xl mx-auto">
+          {/* Skeleton Header */}
+          <div className="mb-8">
+            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+            <div className="h-4 w-96 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
+
+          {/* Skeleton Stats */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="card p-4">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                  <div className="ml-4 flex-1">
+                    <div className="h-3 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-2" />
+                    <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Skeleton Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="card">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                  <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                </div>
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {[...Array(3)].map((_, j) => (
+                    <div key={j} className="px-5 py-4 flex items-center gap-3">
+                      <div className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                      <div className="flex-1">
+                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+                        <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )

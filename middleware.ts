@@ -47,11 +47,6 @@ export async function middleware(request: NextRequest) {
     error,
   } = await supabase.auth.getUser()
 
-  // Debug logging
-  console.log('[Middleware] Path:', request.nextUrl.pathname)
-  console.log('[Middleware] User:', user?.email || 'No user')
-  console.log('[Middleware] Error:', error?.message || 'No error')
-  console.log('[Middleware] Cookies:', request.cookies.getAll().map(c => c.name).join(', '))
 
   // Protect routes
   const { pathname } = request.nextUrl

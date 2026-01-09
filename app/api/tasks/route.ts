@@ -124,6 +124,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Max 500 tasks
+    const offset = parseInt(searchParams.get('offset') || '0')
+    const stageId = searchParams.get('stage_id') // Optional filter by stage
 
     if (!projectId) {
       return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
@@ -143,19 +146,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
     }
 
-    // Get tasks with only needed columns (avoid over-fetching)
-    const { data: tasks, error } = await supabaseAdmin
+    // Build query with pagination
+    let query = supabaseAdmin
       .from('tasks')
-      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by')
+      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by', { count: 'exact' })
       .eq('project_id', projectId)
       .order('position', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    // Optional stage filter for lazy loading columns
+    if (stageId) {
+      query = query.eq('stage_id', stageId)
+    }
+
+    const { data: tasks, error, count } = await query
 
     if (error) {
       console.error('[API] Error fetching tasks:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ tasks: tasks || [] })
+    return NextResponse.json({
+      tasks: tasks || [],
+      pagination: {
+        total: count || 0,
+        limit,
+        offset,
+        hasMore: (offset + limit) < (count || 0)
+      }
+    })
   } catch (error) {
     console.error('[API] Error in GET /api/tasks:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -69,16 +69,10 @@ export async function GET(
         .eq('user_id', user.id)
         .single(),
 
-      // Get members with profiles in a single JOIN query (fixes N+1)
+      // Get members (profiles will be fetched separately to avoid JOIN issues)
       supabaseAdmin
         .from('project_members')
-        .select(`
-          id,
-          role,
-          joined_at,
-          user_id,
-          user:profiles!project_members_user_id_fkey(id, full_name, email, avatar_url)
-        `)
+        .select('id, role, joined_at, user_id')
         .eq('project_id', projectId),
 
       // Get task status counts
@@ -90,7 +84,7 @@ export async function GET(
 
     const { data: project, error: projectError } = projectResult
     const { data: membership } = membershipResult
-    const { data: members } = membersResult
+    const { data: members, error: membersError } = membersResult
     const { data: tasks } = taskCountsResult
 
     if (projectError || !project) {
@@ -101,11 +95,26 @@ export async function GET(
       return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
     }
 
-    // Format members with fallback for missing profiles
-    const memberProfiles = (members || []).map(member => ({
-      ...member,
-      user: member.user || { id: member.user_id, full_name: null, email: '', avatar_url: null }
-    }))
+    // Log if members query failed (helps debugging)
+    if (membersError) {
+      console.error('[API] Error fetching members:', membersError)
+    }
+
+    // Fetch profiles for each member (parallel to avoid N+1 but ensure correct data)
+    const memberProfiles = await Promise.all(
+      (members || []).map(async (member) => {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .eq('id', member.user_id)
+          .single()
+
+        return {
+          ...member,
+          user: profile || { id: member.user_id, full_name: null, email: '', avatar_url: null }
+        }
+      })
+    )
 
     const tasksCount = tasks?.length || 0
     const completedTasksCount = tasks?.filter(t => t.status === 'done').length || 0
