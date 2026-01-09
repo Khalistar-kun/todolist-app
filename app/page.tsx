@@ -10,6 +10,15 @@ export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
 
+  // Handle OAuth redirect - if code param exists, forward to callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    if (code) {
+      router.replace(`/auth/callback?code=${code}`)
+    }
+  }, [router])
+
   useEffect(() => {
     if (user && !loading) {
       router.push('/app')
