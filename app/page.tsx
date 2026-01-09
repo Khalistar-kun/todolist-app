@@ -11,7 +11,7 @@ const MAX_LOADING_TIME_MS = 5000
 export default function HomePage() {
   const [showDemo, setShowDemo] = useState(false)
   const [forceShowLanding, setForceShowLanding] = useState(false)
-  const { user, loading } = useAuth()
+  const { user, status } = useAuth()
   const router = useRouter()
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -24,9 +24,9 @@ export default function HomePage() {
     }
   }, [router])
 
-  // Set timeout to prevent infinite loading
+  // Set timeout to prevent infinite loading - only if auth is still checking
   useEffect(() => {
-    if (loading && !forceShowLanding) {
+    if (status === 'loading' && !forceShowLanding) {
       loadingTimeoutRef.current = setTimeout(() => {
         console.warn('[Home] Loading timeout reached, showing landing page')
         setForceShowLanding(true)
@@ -38,16 +38,18 @@ export default function HomePage() {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  }, [loading, forceShowLanding])
+  }, [status, forceShowLanding])
 
+  // Redirect authenticated users to dashboard
   useEffect(() => {
-    if (user && !loading) {
+    // Only redirect when we have confirmed authentication
+    if (status === 'authenticated' && user) {
       router.push('/app')
     }
-  }, [user, loading, router])
+  }, [user, status, router])
 
-  // Show spinner only if loading, not timed out, and no user
-  if (loading && !forceShowLanding) {
+  // Show spinner while auth is loading (not timed out)
+  if (status === 'loading' && !forceShowLanding) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -55,14 +57,17 @@ export default function HomePage() {
     )
   }
 
-  // Redirect in progress
-  if (user && !forceShowLanding) {
+  // Redirect in progress - show spinner while navigating
+  if (status === 'authenticated' && user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     )
   }
+
+  // Only show landing page when we've confirmed user is NOT authenticated
+  // OR if loading has timed out (forceShowLanding)
 
   return (
     <div className="min-h-screen bg-white">

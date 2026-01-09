@@ -24,7 +24,7 @@ interface RecentTask extends Task {
 const DATA_LOADING_TIMEOUT_MS = 15000
 
 export default function Dashboard() {
-  const { user, loading } = useAuth()
+  const { user, loading, status } = useAuth()
   const { playClick } = useSound()
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -282,7 +282,10 @@ export default function Dashboard() {
     )
   }
 
-  if (!user) {
+  // CRITICAL: Only show login screen when we are CERTAIN user is not authenticated
+  // status === 'unauthenticated' means auth check completed and confirmed no session
+  // This prevents flashing login screen during auth hydration
+  if (status === 'unauthenticated' || !user) {
     return (
       <div className="text-center py-12 animate-fade-in">
         <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">Welcome to TodoApp</h2>
@@ -298,6 +301,7 @@ export default function Dashboard() {
     )
   }
 
+  // At this point, user is guaranteed to be non-null
   return (
     <div className="px-4 py-6 sm:px-0 animate-fade-in">
       <div className="max-w-7xl mx-auto">

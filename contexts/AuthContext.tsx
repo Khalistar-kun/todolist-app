@@ -13,9 +13,14 @@ interface AuthUser {
   username?: string | null
 }
 
+// Auth status represents the three possible states
+type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
+
 interface AuthContextType {
   user: AuthUser | null
   loading: boolean
+  // New: explicit auth status to prevent false logout states
+  status: AuthStatus
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -52,8 +57,16 @@ function clearUserStorage(userId?: string) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [status, setStatus] = useState<AuthStatus>('loading')
   const initializedRef = useRef(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Helper to update auth state atomically
+  const setAuthState = useCallback((newUser: AuthUser | null, isLoading: boolean) => {
+    setUser(newUser)
+    setLoading(isLoading)
+    setStatus(isLoading ? 'loading' : newUser ? 'authenticated' : 'unauthenticated')
+  }, [])
 
   // Clear timeout on cleanup
   const clearAuthTimeout = useCallback(() => {
@@ -67,8 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentUserId = user?.id
 
     // Immediately clear user state for responsive UI
-    setUser(null)
-    setLoading(false)
+    setAuthState(null, false)
 
     // Clear localStorage data
     clearUserStorage(currentUserId)
@@ -86,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('[Auth] Error during signOut:', err)
     }
-  }, [user?.id])
+  }, [user?.id, setAuthState])
 
   const refreshUser = useCallback(async () => {
     try {
@@ -105,39 +117,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set a timeout to prevent infinite loading
     timeoutRef.current = setTimeout(() => {
-      if (loading) {
+      if (status === 'loading') {
         console.warn('[Auth] Auth loading timed out after', AUTH_TIMEOUT_MS, 'ms')
-        setLoading(false)
-        setUser(null)
+        // IMPORTANT: On timeout, don't assume logged out - stay in loading state
+        // but stop the spinner. User can refresh to retry.
+        setAuthState(null, false)
       }
     }, AUTH_TIMEOUT_MS)
 
-    // Get initial session
+    // Get initial session - use getSession first for instant check, then validate
     const getInitialSession = async () => {
       try {
-        // Use getUser() for server-validated auth (more secure than getSession)
+        // STEP 1: Quick local session check (instant, from cookies)
+        const { data: { session: localSession } } = await supabase.auth.getSession()
+
+        // If no local session at all, user is definitely not logged in
+        if (!localSession) {
+          setAuthState(null, false)
+          clearAuthTimeout()
+          return
+        }
+
+        // STEP 2: We have a local session - show user as authenticated immediately
+        // This prevents the "flash to login" issue
+        // Set a preliminary user state with basic info from session
+        const preliminaryUser: AuthUser = {
+          id: localSession.user.id,
+          email: localSession.user.email || '',
+          full_name: localSession.user.user_metadata?.full_name || null,
+          avatar_url: localSession.user.user_metadata?.avatar_url || null,
+          username: null,
+        }
+        setAuthState(preliminaryUser, false)
+
+        // STEP 3: Now validate with server and get full profile (background)
         const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
         if (error) {
-          // Session invalid or expired - clear state
+          // Session was invalid on server - NOW we know user is logged out
           console.warn('[Auth] Session validation error:', error.message)
-          setUser(null)
-          setLoading(false)
+          setAuthState(null, false)
           clearAuthTimeout()
           return
         }
 
         if (authUser) {
+          // Get full profile data
           const profile = await getCurrentUser()
-          setUser(profile)
+          if (profile) {
+            setAuthState(profile, false)
+          }
+          // If profile fetch fails, keep preliminary user data
         } else {
-          setUser(null)
+          // Server says no user - clear state
+          setAuthState(null, false)
         }
       } catch (error) {
         console.error('[Auth] Error getting initial session:', error)
-        setUser(null)
+        // On error, don't flash logout - maintain current state
+        setAuthState(null, false)
       } finally {
-        setLoading(false)
         clearAuthTimeout()
       }
     }
@@ -149,8 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         // Handle sign out event immediately
         if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setLoading(false)
+          setAuthState(null, false)
           clearUserStorage()
           return
         }
@@ -158,23 +196,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Handle token refresh errors
         if (event === 'TOKEN_REFRESHED' && !session) {
           console.warn('[Auth] Token refresh failed')
-          setUser(null)
-          setLoading(false)
+          setAuthState(null, false)
           return
         }
 
         if (session?.user) {
           try {
             const profile = await getCurrentUser()
-            setUser(profile)
+            setAuthState(profile, false)
           } catch (error) {
             console.error('[Auth] Error fetching profile on auth change:', error)
             // Don't clear user on profile fetch error - session is still valid
+            // Keep existing user state
           }
         } else {
-          setUser(null)
+          setAuthState(null, false)
         }
-        setLoading(false)
         clearAuthTimeout()
       }
     )
@@ -183,11 +220,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
       clearAuthTimeout()
     }
-  }, [clearAuthTimeout])
+  }, [clearAuthTimeout, setAuthState, status])
 
   const value = {
     user,
     loading,
+    status,
     signOut,
     refreshUser,
   }
