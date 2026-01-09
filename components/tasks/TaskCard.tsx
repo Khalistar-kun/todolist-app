@@ -1,20 +1,35 @@
 "use client"
 
+import { useState, useRef, useCallback } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task } from '@/lib/supabase'
-import { Avatar } from '@/components/Avatar'
 import { format } from 'date-fns'
 
 interface TaskCardProps {
-  task: Task
+  task: Task & {
+    comments_count?: number
+    assignees?: Array<{ id: string; full_name: string | null; avatar_url: string | null }>
+  }
   onClick: () => void
+  onCommentClick?: (task: Task, anchorRect: DOMRect) => void
+  onExpandClick?: (task: Task) => void
   isDragging?: boolean
   isSelected?: boolean
   onSelect?: (taskId: string, ctrlKey: boolean) => void
 }
 
-export function TaskCard({ task, onClick, isDragging = false, isSelected = false, onSelect }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onClick,
+  onCommentClick,
+  onExpandClick,
+  isDragging = false,
+  isSelected = false,
+  onSelect,
+}: TaskCardProps) {
+  const commentButtonRef = useRef<HTMLButtonElement>(null)
+
   const {
     attributes,
     listeners,
@@ -61,8 +76,9 @@ export function TaskCard({ task, onClick, isDragging = false, isSelected = false
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done'
   const isDueSoon = task.due_date && new Date(task.due_date) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) && task.status !== 'done'
 
-  const handleClick = (e: React.MouseEvent) => {
-    // Check if Ctrl key is held
+  // Main card click - opens task detail
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Check if Ctrl key is held for multi-select
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
       e.stopPropagation()
@@ -74,52 +90,99 @@ export function TaskCard({ task, onClick, isDragging = false, isSelected = false
     }
   }
 
+  // Comment icon click - opens quick comment panel
+  const handleCommentClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    // CRITICAL: Stop propagation to prevent card click and drag
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (onCommentClick && commentButtonRef.current) {
+      const rect = commentButtonRef.current.getBoundingClientRect()
+      onCommentClick(task, rect)
+    }
+  }, [task, onCommentClick])
+
+  // Expand icon click - opens full task detail view
+  const handleExpandClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    // CRITICAL: Stop propagation to prevent card click and drag
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (onExpandClick) {
+      onExpandClick(task)
+    } else {
+      // Fallback to main onClick
+      onClick()
+    }
+  }, [task, onExpandClick, onClick])
+
+  // Handle keyboard accessibility for icons
+  const handleIconKeyDown = useCallback((
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    action: () => void
+  ) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      e.stopPropagation()
+      action()
+    }
+  }, [])
+
+  const commentsCount = task.comments_count || 0
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 ${
+      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group ${
         isDragging ? 'opacity-50 rotate-3' : ''
       } ${
         isSelected
           ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-500/30 dark:ring-blue-400/30 bg-blue-50/50 dark:bg-blue-900/20'
           : 'border-gray-200 dark:border-gray-700'
       }`}
-      onClick={handleClick}
+      onClick={handleCardClick}
       {...attributes}
       {...listeners}
     >
       {/* Selection checkbox indicator */}
       {isSelected && (
-        <div className="absolute -top-2 -left-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+        <div className="absolute -top-2 -left-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md z-10">
           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
           </svg>
         </div>
       )}
+
       {/* Header with priority and actions */}
       <div className="flex items-start justify-between mb-3">
         {/* Priority Badge */}
-        {task.priority !== 'none' && (
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getPriorityColor(
-              task.priority
-            )}`}
-          >
-            {getPriorityLabel(task.priority)}
-          </span>
-        )}
+        <div className="flex-1">
+          {task.priority !== 'none' && (
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getPriorityColor(
+                task.priority
+              )}`}
+            >
+              {getPriorityLabel(task.priority)}
+            </span>
+          )}
+        </div>
 
-        {/* Drag Handle */}
-        <div className="flex items-center space-x-1 opacity-0 hover:opacity-100 transition-opacity">
+        {/* Action Buttons - Always visible on hover */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* More menu button */}
           <button
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             onClick={(e) => {
+              e.preventDefault()
               e.stopPropagation()
-              // Open task menu
+              // TODO: Open task menu
             }}
+            onKeyDown={(e) => handleIconKeyDown(e, () => {})}
+            title="More options"
           >
-            <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
           </button>
@@ -171,34 +234,76 @@ export function TaskCard({ task, onClick, isDragging = false, isSelected = false
           </div>
         )}
 
-        {/* Right side icons */}
-        <div className="flex items-center space-x-2 ml-auto">
-          {/* Comments Count */}
-          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-            <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        {/* Right side icons - Interactive */}
+        <div className="flex items-center gap-1 ml-auto">
+          {/* Comment Button - CLICKABLE */}
+          <button
+            ref={commentButtonRef}
+            onClick={handleCommentClick}
+            onKeyDown={(e) => handleIconKeyDown(e, () => {
+              if (commentButtonRef.current) {
+                const rect = commentButtonRef.current.getBoundingClientRect()
+                onCommentClick?.(task, rect)
+              }
+            })}
+            className="flex items-center gap-1 px-1.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+            title="View comments"
+            aria-label={`${commentsCount} comment${commentsCount !== 1 ? 's' : ''}`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            {/* Comment count would come from props */}
-          </div>
+            {commentsCount > 0 && (
+              <span className="font-medium">{commentsCount}</span>
+            )}
+          </button>
 
-          {/* Attachments */}
-          {/* Attachment count would come from props */}
-
-          {/* Time Spent */}
-          {/* Time spent would come from props */}
+          {/* Expand Button - CLICKABLE */}
+          <button
+            onClick={handleExpandClick}
+            onKeyDown={(e) => handleIconKeyDown(e, () => onExpandClick?.(task) || onClick())}
+            className="flex items-center justify-center w-6 h-6 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            title="View task details"
+            aria-label="Expand task"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
 
           {/* Assignees */}
-          <div className="flex -space-x-2">
-            {/* Assignee avatars would come from props */}
-            <div className="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 border-2 border-white dark:border-gray-800 flex items-center justify-center">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">+</span>
+          {task.assignees && task.assignees.length > 0 && (
+            <div className="flex -space-x-1.5 ml-1">
+              {task.assignees.slice(0, 3).map((assignee) => (
+                <div
+                  key={assignee.id}
+                  className="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 border-2 border-white dark:border-gray-800 flex items-center justify-center overflow-hidden"
+                  title={assignee.full_name || 'Unassigned'}
+                >
+                  {assignee.avatar_url ? (
+                    <img
+                      src={assignee.avatar_url}
+                      alt={assignee.full_name || 'Assignee'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      {(assignee.full_name || 'U')[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {task.assignees.length > 3 && (
+                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    +{task.assignees.length - 3}
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
-
-      {/* Subtasks Progress */}
-      {/* Subtask progress would be shown here if available */}
     </div>
   )
 }

@@ -13,11 +13,21 @@ interface KanbanColumnProps {
   }
   tasks: Task[]
   onTaskClick: (task: Task) => void
+  onCommentClick?: (task: Task, anchorRect: DOMRect) => void
+  onExpandClick?: (task: Task) => void
   selectedTaskIds?: Set<string>
   onTaskSelect?: (taskId: string, ctrlKey: boolean) => void
 }
 
-export function KanbanColumn({ stage, tasks, onTaskClick, selectedTaskIds, onTaskSelect }: KanbanColumnProps) {
+export function KanbanColumn({
+  stage,
+  tasks,
+  onTaskClick,
+  onCommentClick,
+  onExpandClick,
+  selectedTaskIds,
+  onTaskSelect,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
   })
@@ -68,6 +78,8 @@ export function KanbanColumn({ stage, tasks, onTaskClick, selectedTaskIds, onTas
                   key={task.id}
                   task={task}
                   onClick={() => onTaskClick(task)}
+                  onCommentClick={onCommentClick}
+                  onExpandClick={onExpandClick}
                   isSelected={selectedTaskIds?.has(task.id) || false}
                   onSelect={onTaskSelect}
                 />

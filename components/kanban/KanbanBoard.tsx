@@ -18,6 +18,14 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Project, Task } from '@/lib/supabase'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCard } from '../tasks/TaskCard'
+import { QuickCommentPanel } from '../tasks/QuickCommentPanel'
+
+// State for comment panel
+interface CommentPanelState {
+  isOpen: boolean
+  task: Task | null
+  anchorRect: DOMRect | null
+}
 
 interface KanbanBoardProps {
   project: Project
@@ -40,6 +48,37 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+
+  // Quick comment panel state
+  const [commentPanel, setCommentPanel] = useState<CommentPanelState>({
+    isOpen: false,
+    task: null,
+    anchorRect: null,
+  })
+
+  // Handle comment icon click - opens quick comment panel
+  const handleCommentClick = useCallback((task: Task, anchorRect: DOMRect) => {
+    setCommentPanel({
+      isOpen: true,
+      task,
+      anchorRect,
+    })
+  }, [])
+
+  // Close comment panel
+  const handleCloseCommentPanel = useCallback(() => {
+    setCommentPanel({
+      isOpen: false,
+      task: null,
+      anchorRect: null,
+    })
+  }, [])
+
+  // Handle expand icon click - opens full task detail
+  const handleExpandClick = useCallback((task: Task) => {
+    // Use the main onTaskClick handler for full task view
+    onTaskClick(task)
+  }, [onTaskClick])
 
   // Handle task selection with Ctrl+Click
   const handleTaskSelect = useCallback((taskId: string, ctrlKey: boolean) => {
@@ -304,6 +343,8 @@ export function KanbanBoard({
               stage={stage}
               tasks={tasks[stage.id] || []}
               onTaskClick={onTaskClick}
+              onCommentClick={handleCommentClick}
+              onExpandClick={handleExpandClick}
               selectedTaskIds={selectedTaskIds}
               onTaskSelect={handleTaskSelect}
             />
@@ -328,6 +369,17 @@ export function KanbanBoard({
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-4 text-center">
           Tip: Hold Ctrl and click to select multiple tasks
         </p>
+      )}
+
+      {/* Quick Comment Panel - renders outside the DndContext to avoid interference */}
+      {commentPanel.task && (
+        <QuickCommentPanel
+          taskId={commentPanel.task.id}
+          projectId={commentPanel.task.project_id}
+          isOpen={commentPanel.isOpen}
+          onClose={handleCloseCommentPanel}
+          anchorRect={commentPanel.anchorRect}
+        />
       )}
     </div>
   )
