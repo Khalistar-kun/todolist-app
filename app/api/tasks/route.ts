@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
     // Build query with pagination
     let query = supabaseAdmin
       .from('tasks')
-      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by', { count: 'exact' })
+      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by, color', { count: 'exact' })
       .eq('project_id', projectId)
       .order('position', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -331,7 +331,7 @@ export async function PATCH(request: NextRequest) {
     const oldStageId = existingTask.stage_id
 
     // Update the task (only include fields that exist in the schema)
-    const allowedFields = ['title', 'description', 'status', 'stage_id', 'priority', 'due_date', 'tags', 'custom_fields', 'completed_at']
+    const allowedFields = ['title', 'description', 'status', 'stage_id', 'priority', 'due_date', 'tags', 'custom_fields', 'completed_at', 'color']
     const filteredUpdates: Record<string, any> = {}
 
     for (const field of allowedFields) {
