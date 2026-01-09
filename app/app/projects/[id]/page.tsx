@@ -355,6 +355,7 @@ export default function ProjectPage() {
         due_date: task.due_date ?? undefined,
         tags: task.tags,
         custom_fields: task.custom_fields,
+        color: task.color ?? undefined,
       })
 
       // Add to tasks list

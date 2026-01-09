@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { project_id, title, description, stage_id, priority, due_date, tags } = body
+    const { project_id, title, description, stage_id, priority, due_date, tags, color } = body
 
     if (!project_id || !title) {
       return NextResponse.json(
@@ -235,6 +235,7 @@ export async function POST(request: NextRequest) {
         created_by: user.id,
         status: 'todo',
         position: 0,
+        color: color || null,
       })
       .select()
       .single()

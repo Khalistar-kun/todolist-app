@@ -50,7 +50,6 @@ export function TaskCard({
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [showColorPicker, setShowColorPicker] = useState(false)
 
   const {
     attributes,
@@ -110,7 +109,6 @@ export function TaskCard({
         !menuButtonRef.current.contains(e.target as Node)
       ) {
         setMenuOpen(false)
-        setShowColorPicker(false)
       }
     }
 
@@ -123,7 +121,6 @@ export function TaskCard({
     e.preventDefault()
     e.stopPropagation()
     setMenuOpen(!menuOpen)
-    setShowColorPicker(false)
   }, [menuOpen])
 
   // Handle delete
@@ -145,7 +142,6 @@ export function TaskCard({
   // Handle color change
   const handleColorSelect = useCallback((color: string | null) => {
     setMenuOpen(false)
-    setShowColorPicker(false)
     onColorChange?.(task, color)
   }, [task, onColorChange])
 
@@ -287,31 +283,17 @@ export function TaskCard({
                 Edit Task
               </button>
 
-              {/* Color submenu */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setShowColorPicker(!showColorPicker)
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 justify-between"
-                >
-                  <span className="flex items-center gap-2">
+              {/* Color Picker - inline in menu for better UX */}
+              {onColorChange && (
+                <>
+                  <div className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z" />
                     </svg>
-                    Set Color
-                  </span>
-                  <svg className={`w-4 h-4 transition-transform ${showColorPicker ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </button>
-
-                {/* Color Picker */}
-                {showColorPicker && (
-                  <div className="absolute left-full top-0 ml-1 w-36 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 px-2">
-                    <div className="grid grid-cols-4 gap-1.5">
+                    Color
+                  </div>
+                  <div className="px-3 pb-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {TASK_COLORS.map((color) => (
                         <button
                           key={color.label}
@@ -320,21 +302,22 @@ export function TaskCard({
                             e.stopPropagation()
                             handleColorSelect(color.value)
                           }}
-                          className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
+                          className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
                             task.color === color.value
                               ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                              : 'border-gray-300 dark:border-gray-600'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                           } ${color.value === null ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
                           style={color.value ? { backgroundColor: color.value } : undefined}
                           title={color.label}
+                          aria-label={`Set color to ${color.label}`}
                         >
                           {color.value === null && (
-                            <svg className="w-full h-full text-gray-400 dark:text-gray-500 p-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <svg className="w-full h-full text-gray-400 dark:text-gray-500 p-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                             </svg>
                           )}
                           {task.color === color.value && color.value !== null && (
-                            <svg className="w-full h-full text-white p-1" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                            <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
                           )}
@@ -342,8 +325,9 @@ export function TaskCard({
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                </>
+              )}
 
               {/* Duplicate */}
               {onDuplicate && (
