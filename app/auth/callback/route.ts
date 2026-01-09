@@ -83,7 +83,7 @@ export async function GET(request: Request) {
           data.user.user_metadata?.picture ||
           null
 
-        // Create profile
+        // Create profile with profile_completed = false for new users
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
@@ -91,6 +91,7 @@ export async function GET(request: Request) {
             email: data.user.email!,
             full_name: fullName,
             avatar_url: avatarUrl,
+            profile_completed: false,
           })
 
         if (profileError) {
@@ -125,6 +126,9 @@ export async function GET(request: Request) {
             }
           }
         }
+
+        // Redirect new users to profile setup page
+        return NextResponse.redirect(`${origin}/auth/setup-profile`)
       }
     }
 

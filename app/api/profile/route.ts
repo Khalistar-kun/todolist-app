@@ -86,7 +86,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { full_name, avatar_url, bio } = body
+    const { full_name, avatar_url, bio, profile_completed } = body
 
     const supabaseAdmin = getSupabaseAdmin()
 
@@ -102,14 +102,21 @@ export async function PATCH(request: NextRequest) {
 
     if (existingProfile) {
       // Update existing profile
+      const updateData: Record<string, any> = {
+        full_name: full_name ?? null,
+        avatar_url: avatar_url ?? null,
+        bio: bio ?? null,
+        updated_at: new Date().toISOString(),
+      }
+
+      // Only update profile_completed if explicitly set to true
+      if (profile_completed === true) {
+        updateData.profile_completed = true
+      }
+
       const result = await supabaseAdmin
         .from('profiles')
-        .update({
-          full_name: full_name ?? null,
-          avatar_url: avatar_url ?? null,
-          bio: bio ?? null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', user.id)
         .select()
         .single()
@@ -126,6 +133,7 @@ export async function PATCH(request: NextRequest) {
           full_name: full_name ?? null,
           avatar_url: avatar_url ?? null,
           bio: bio ?? null,
+          profile_completed: profile_completed ?? false,
         })
         .select()
         .single()

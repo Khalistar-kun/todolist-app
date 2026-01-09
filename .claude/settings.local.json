@@ -35,7 +35,8 @@
       "Bash(gh repo create:*)",
       "Bash(git push:*)",
       "Bash(GIT_TRACE=1 git push:*)",
-      "Bash(gh auth setup-git:*)"
+      "Bash(gh auth setup-git:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }
