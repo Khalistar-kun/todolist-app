@@ -11,10 +11,10 @@ async function sendSlackNotification(
   message: { text: string; blocks?: any[] }
 ) {
   try {
-    // Get Slack integration for this project
+    // Get Slack integration for this project (only needed columns)
     const { data: slackIntegration } = await supabaseAdmin
       .from('slack_integrations')
-      .select('*')
+      .select('access_token, webhook_url, channel_id, notify_on_task_create, notify_on_task_update, notify_on_task_delete, notify_on_task_move, notify_on_task_complete')
       .eq('project_id', projectId)
       .single()
 
@@ -143,12 +143,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
     }
 
-    // Get tasks
+    // Get tasks with only needed columns (avoid over-fetching)
     const { data: tasks, error } = await supabaseAdmin
       .from('tasks')
-      .select('*')
+      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: true })
+      .order('position', { ascending: true })
 
     if (error) {
       console.error('[API] Error fetching tasks:', error)

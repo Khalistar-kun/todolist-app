@@ -117,6 +117,30 @@ export default function ProjectPage() {
       return
     }
 
+    // Optimistic update - update UI immediately
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const newTasks = { ...prev }
+      for (const stageId of Object.keys(newTasks)) {
+        newTasks[stageId] = newTasks[stageId].map(t =>
+          t.id === updatedTask.id ? updatedTask : t
+        )
+      }
+      // Handle stage change
+      if (updatedTask.stage_id !== selectedTask?.stage_id) {
+        // Remove from old stage
+        if (selectedTask?.stage_id) {
+          newTasks[selectedTask.stage_id] = newTasks[selectedTask.stage_id]?.filter(t => t.id !== updatedTask.id) || []
+        }
+        // Add to new stage
+        if (!newTasks[updatedTask.stage_id]) {
+          newTasks[updatedTask.stage_id] = []
+        }
+        newTasks[updatedTask.stage_id] = [...newTasks[updatedTask.stage_id], updatedTask]
+      }
+      return newTasks
+    })
+
     try {
       await TaskService.updateTask(updatedTask.id, {
         title: updatedTask.title,
@@ -130,8 +154,9 @@ export default function ProjectPage() {
         completed_at: updatedTask.completed_at ?? undefined,
       })
       toast.success('Task updated successfully')
-      fetchProjectData() // Refresh tasks
     } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
       toast.error(error.message || 'Failed to update task')
     }
   }
@@ -142,10 +167,39 @@ export default function ProjectPage() {
       return
     }
 
+    // Optimistic update - move task in UI immediately
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const newTasks: Record<string, Task[]> = {}
+      let movedTask: Task | null = null
+
+      // Find and remove the task from its current stage
+      for (const stageId of Object.keys(prev)) {
+        const stageTasks = [...(prev[stageId] || [])]
+        const taskIndex = stageTasks.findIndex(t => t.id === taskId)
+        if (taskIndex !== -1) {
+          movedTask = { ...stageTasks[taskIndex], stage_id: newStageId }
+          stageTasks.splice(taskIndex, 1)
+        }
+        newTasks[stageId] = stageTasks
+      }
+
+      // Add the task to its new stage at the correct position
+      if (movedTask) {
+        if (!newTasks[newStageId]) {
+          newTasks[newStageId] = []
+        }
+        newTasks[newStageId].splice(newPosition, 0, movedTask)
+      }
+
+      return newTasks
+    })
+
     try {
       await TaskService.moveTask(taskId, newStageId, newPosition)
-      fetchProjectData() // Refresh tasks
     } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
       toast.error(error.message || 'Failed to move task')
     }
   }
@@ -156,10 +210,22 @@ export default function ProjectPage() {
       return
     }
 
+    // Optimistic update - reorder tasks in UI immediately
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const stageTasks = prev[stageId] || []
+      const taskMap = new Map(stageTasks.map(t => [t.id, t]))
+      const reorderedTasks = taskIds
+        .map(id => taskMap.get(id))
+        .filter((t): t is Task => t !== undefined)
+      return { ...prev, [stageId]: reorderedTasks }
+    })
+
     try {
       await TaskService.reorderTasks(projectId, stageId, taskIds)
-      fetchProjectData() // Refresh tasks
     } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
       toast.error(error.message || 'Failed to reorder tasks')
     }
   }
@@ -170,6 +236,35 @@ export default function ProjectPage() {
       return
     }
 
+    // Optimistic update - move all tasks in UI immediately
+    const previousTasks = { ...tasks }
+    const taskIdSet = new Set(taskIds)
+    setTasks(prev => {
+      const newTasks: Record<string, Task[]> = {}
+      const movedTasks: Task[] = []
+
+      // Remove tasks from their current stages and collect them
+      for (const stageId of Object.keys(prev)) {
+        const remaining: Task[] = []
+        for (const task of prev[stageId] || []) {
+          if (taskIdSet.has(task.id)) {
+            movedTasks.push({ ...task, stage_id: newStageId })
+          } else {
+            remaining.push(task)
+          }
+        }
+        newTasks[stageId] = remaining
+      }
+
+      // Add all moved tasks to the new stage
+      if (!newTasks[newStageId]) {
+        newTasks[newStageId] = []
+      }
+      newTasks[newStageId] = [...newTasks[newStageId], ...movedTasks]
+
+      return newTasks
+    })
+
     try {
       // Move all tasks to the new stage
       await Promise.all(
@@ -178,8 +273,9 @@ export default function ProjectPage() {
         )
       )
       toast.success(`Moved ${taskIds.length} task${taskIds.length > 1 ? 's' : ''} successfully`)
-      fetchProjectData() // Refresh tasks
     } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
       toast.error(error.message || 'Failed to move tasks')
     }
   }

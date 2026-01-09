@@ -52,60 +52,60 @@ export async function GET(
 
     const supabaseAdmin = getSupabaseAdmin()
 
-    // Get the project
-    const { data: project, error: projectError } = await supabaseAdmin
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .single()
+    // Run all queries in parallel for better performance
+    const [projectResult, membershipResult, membersResult, taskCountsResult] = await Promise.all([
+      // Get project with only needed columns
+      supabaseAdmin
+        .from('projects')
+        .select('id, name, description, color, status, organization_id, workflow_stages, created_at')
+        .eq('id', projectId)
+        .single(),
+
+      // Verify user is a member
+      supabaseAdmin
+        .from('project_members')
+        .select('id, role')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .single(),
+
+      // Get members with profiles in a single JOIN query (fixes N+1)
+      supabaseAdmin
+        .from('project_members')
+        .select(`
+          id,
+          role,
+          joined_at,
+          user_id,
+          user:profiles!project_members_user_id_fkey(id, full_name, email, avatar_url)
+        `)
+        .eq('project_id', projectId),
+
+      // Get task status counts
+      supabaseAdmin
+        .from('tasks')
+        .select('status')
+        .eq('project_id', projectId)
+    ])
+
+    const { data: project, error: projectError } = projectResult
+    const { data: membership } = membershipResult
+    const { data: members } = membersResult
+    const { data: tasks } = taskCountsResult
 
     if (projectError || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    // Verify user is a member
-    const { data: membership } = await supabaseAdmin
-      .from('project_members')
-      .select('id, role')
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-      .single()
-
     if (!membership) {
       return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
     }
 
-    // Get members
-    const { data: members } = await supabaseAdmin
-      .from('project_members')
-      .select(`
-        id,
-        role,
-        joined_at,
-        user_id
-      `)
-      .eq('project_id', projectId)
-
-    // Get profiles for members
-    const memberProfiles = await Promise.all(
-      (members || []).map(async (member) => {
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('id, full_name, email, avatar_url')
-          .eq('id', member.user_id)
-          .single()
-        return {
-          ...member,
-          user: profile || { id: member.user_id, full_name: null, email: '', avatar_url: null }
-        }
-      })
-    )
-
-    // Get task counts
-    const { data: tasks } = await supabaseAdmin
-      .from('tasks')
-      .select('status')
-      .eq('project_id', projectId)
+    // Format members with fallback for missing profiles
+    const memberProfiles = (members || []).map(member => ({
+      ...member,
+      user: member.user || { id: member.user_id, full_name: null, email: '', avatar_url: null }
+    }))
 
     const tasksCount = tasks?.length || 0
     const completedTasksCount = tasks?.filter(t => t.status === 'done').length || 0
