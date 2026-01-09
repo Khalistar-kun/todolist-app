@@ -10,7 +10,7 @@ interface MentionAutocompleteProps {
   selectedIndex: number
   onSelect: (user: MentionUser) => void
   // Position relative to text input
-  anchorRef?: React.RefObject<HTMLElement>
+  anchorRef?: React.RefObject<HTMLElement | null>
   // For positioning based on caret position
   caretPosition?: { top: number; left: number }
 }

@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import type { Project, Task, Comment } from '@/lib/supabase'
 import { TaskService, type TaskWithDetails } from '@/lib/services/TaskService'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete'
+import { MentionAutocomplete, MentionText } from '@/components/mentions/MentionAutocomplete'
 
 interface CommentWithUser extends Comment {
   user?: {
@@ -71,6 +73,20 @@ export function TaskModal({
   const [comments, setComments] = useState<CommentWithUser[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [addingComment, setAddingComment] = useState(false)
+
+  // Refs for mention autocomplete positioning
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const subtaskInputRef = useRef<HTMLInputElement>(null)
+
+  // Mention autocomplete for comments
+  const commentMention = useMentionAutocomplete(newComment, {
+    projectId: project.id,
+  })
+
+  // Mention autocomplete for subtasks
+  const subtaskMention = useMentionAutocomplete(newSubtask, {
+    projectId: project.id,
+  })
 
   const isEditing = !!task
 
@@ -591,21 +607,54 @@ export function TaskModal({
                   {activeTab === 'subtasks' && (
                     <div className="space-y-3">
                       {/* Add Subtask */}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newSubtask}
-                          onChange={(e) => setNewSubtask(e.target.value)}
-                          placeholder="Add subtask..."
-                          className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddSubtask()}
-                        />
-                        <button
-                          onClick={handleAddSubtask}
-                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                        >
-                          Add
-                        </button>
+                      <div className="relative">
+                        <div className="flex gap-2">
+                          <input
+                            ref={subtaskInputRef}
+                            type="text"
+                            value={newSubtask}
+                            onChange={(e) => {
+                              setNewSubtask(e.target.value)
+                              subtaskMention.handleTextChange(e.target.value, e.target.selectionStart || 0)
+                            }}
+                            onKeyDown={(e) => {
+                              if (subtaskMention.handleKeyDown(e)) {
+                                return
+                              }
+                              if (e.key === 'Enter') {
+                                handleAddSubtask()
+                              }
+                            }}
+                            placeholder="Add subtask... (@ to mention)"
+                            className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <button
+                            onClick={handleAddSubtask}
+                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {/* Mention Autocomplete */}
+                        {subtaskMention.isOpen && (
+                          <MentionAutocomplete
+                            users={subtaskMention.users}
+                            isLoading={subtaskMention.isLoading}
+                            isOpen={subtaskMention.isOpen}
+                            selectedIndex={subtaskMention.selectedIndex}
+                            onSelect={(user) => {
+                              const result = subtaskMention.selectUser(user)
+                              if (result) {
+                                setNewSubtask(result.text)
+                                setTimeout(() => {
+                                  subtaskInputRef.current?.focus()
+                                  subtaskInputRef.current?.setSelectionRange(result.newCursorPosition, result.newCursorPosition)
+                                }, 0)
+                              }
+                            }}
+                            anchorRef={subtaskInputRef}
+                          />
+                        )}
                       </div>
 
                       {/* Subtasks List */}
@@ -623,7 +672,7 @@ export function TaskModal({
                                 subtask.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
                               }`}
                             >
-                              {subtask.title}
+                              <MentionText text={subtask.title} />
                             </span>
                           </div>
                         ))}
@@ -639,14 +688,45 @@ export function TaskModal({
                   {activeTab === 'comments' && (
                     <div className="space-y-4">
                       {/* Add Comment */}
-                      <div>
+                      <div className="relative">
                         <textarea
+                          ref={commentTextareaRef}
                           value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Add a comment..."
+                          onChange={(e) => {
+                            setNewComment(e.target.value)
+                            commentMention.handleTextChange(e.target.value, e.target.selectionStart || 0)
+                          }}
+                          onKeyDown={(e) => {
+                            if (commentMention.handleKeyDown(e)) {
+                              // Mention autocomplete handled the key
+                              return
+                            }
+                          }}
+                          placeholder="Add a comment... (type @ to mention)"
                           rows={3}
                           className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                         />
+                        {/* Mention Autocomplete */}
+                        {commentMention.isOpen && (
+                          <MentionAutocomplete
+                            users={commentMention.users}
+                            isLoading={commentMention.isLoading}
+                            isOpen={commentMention.isOpen}
+                            selectedIndex={commentMention.selectedIndex}
+                            onSelect={(user) => {
+                              const result = commentMention.selectUser(user)
+                              if (result) {
+                                setNewComment(result.text)
+                                // Focus back and set cursor position
+                                setTimeout(() => {
+                                  commentTextareaRef.current?.focus()
+                                  commentTextareaRef.current?.setSelectionRange(result.newCursorPosition, result.newCursorPosition)
+                                }, 0)
+                              }
+                            }}
+                            anchorRef={commentTextareaRef}
+                          />
+                        )}
                         <button
                           onClick={handleAddComment}
                           disabled={!newComment.trim() || addingComment}
@@ -706,7 +786,7 @@ export function TaskModal({
                                   </span>
                                 </div>
                                 <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap break-words">
-                                  {comment.content}
+                                  <MentionText text={comment.content} />
                                 </p>
                               </div>
                             </div>

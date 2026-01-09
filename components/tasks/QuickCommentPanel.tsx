@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { Comment } from '@/lib/supabase'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete'
+import { MentionAutocomplete, MentionText } from '@/components/mentions/MentionAutocomplete'
 
 interface CommentWithAuthor extends Comment {
   author?: {
@@ -36,6 +38,11 @@ export function QuickCommentPanel({
   const [submitting, setSubmitting] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Mention autocomplete
+  const mention = useMentionAutocomplete(newComment, {
+    projectId,
+  })
 
   // Fetch comments on open
   const fetchComments = useCallback(async () => {
@@ -120,6 +127,10 @@ export function QuickCommentPanel({
 
   // Handle Ctrl+Enter to submit
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Let mention autocomplete handle keys first
+    if (mention.handleKeyDown(e)) {
+      return
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault()
       handleSubmit(e as any)
@@ -239,7 +250,7 @@ export function QuickCommentPanel({
                       </span>
                     </div>
                     <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5 whitespace-pre-wrap break-words">
-                      {comment.content}
+                      <MentionText text={comment.content} />
                     </p>
                   </div>
                 </div>
@@ -249,16 +260,39 @@ export function QuickCommentPanel({
         </div>
 
         {/* Input area */}
-        <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 relative">
           <textarea
             ref={inputRef}
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
+            onChange={(e) => {
+              setNewComment(e.target.value)
+              mention.handleTextChange(e.target.value, e.target.selectionStart || 0)
+            }}
             onKeyDown={handleKeyDown}
-            placeholder="Add a comment..."
+            placeholder="Add a comment... (@ to mention)"
             rows={2}
             className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           />
+          {/* Mention Autocomplete */}
+          {mention.isOpen && (
+            <MentionAutocomplete
+              users={mention.users}
+              isLoading={mention.isLoading}
+              isOpen={mention.isOpen}
+              selectedIndex={mention.selectedIndex}
+              onSelect={(user) => {
+                const result = mention.selectUser(user)
+                if (result) {
+                  setNewComment(result.text)
+                  setTimeout(() => {
+                    inputRef.current?.focus()
+                    inputRef.current?.setSelectionRange(result.newCursorPosition, result.newCursorPosition)
+                  }, 0)
+                }
+              }}
+              anchorRef={inputRef}
+            />
+          )}
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-gray-400 dark:text-gray-500">
               Ctrl+Enter to send
