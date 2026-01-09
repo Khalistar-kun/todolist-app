@@ -139,13 +139,22 @@ export function QuickCommentPanel({
 
   if (!isOpen) return null
 
+  // Check if we're on mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
   // Calculate position
   const style: React.CSSProperties = {
     position: 'fixed',
     zIndex: 9999,
   }
 
-  if (anchorRect) {
+  if (isMobile) {
+    // On mobile, show as bottom sheet
+    style.left = '0'
+    style.right = '0'
+    style.bottom = '0'
+    style.top = 'auto'
+  } else if (anchorRect) {
     // Position below the anchor, aligned to the right
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
@@ -175,14 +184,25 @@ export function QuickCommentPanel({
   return (
     <>
       {/* Backdrop for focus trap */}
-      <div className="fixed inset-0 z-[9998]" onClick={onClose} />
+      <div className="fixed inset-0 z-[9998] bg-black/20 sm:bg-transparent" onClick={onClose} />
 
       <div
         ref={panelRef}
         style={style}
-        className="w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[400px] animate-scale-in"
+        className={`bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col animate-scale-in ${
+          isMobile
+            ? 'w-full rounded-t-xl max-h-[70vh] border-b-0'
+            : 'w-80 rounded-xl max-h-[400px]'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile drag handle */}
+        {isMobile && (
+          <div className="flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">

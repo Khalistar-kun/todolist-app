@@ -12,6 +12,7 @@ import { TaskModal } from '@/components/tasks/TaskModal'
 import MemberManagement from '@/components/projects/MemberManagement'
 import { SlackIntegration } from '@/components/projects/SlackIntegration'
 import { useProjectPermissions, roleConfig } from '@/hooks/useProjectPermissions'
+import { SkeletonProjectHeader, SkeletonKanbanBoard } from '@/components/ui/Skeleton'
 import toast from 'react-hot-toast'
 
 type TabType = 'board' | 'members' | 'settings'
@@ -293,8 +294,13 @@ export default function ProjectPage() {
 
   if (loading || permissionsLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="spinner spinner-lg"></div>
+      <div className="px-4 py-6 sm:px-0">
+        <div className="max-w-7xl mx-auto">
+          <SkeletonProjectHeader />
+          <div className="mt-6">
+            <SkeletonKanbanBoard />
+          </div>
+        </div>
       </div>
     )
   }

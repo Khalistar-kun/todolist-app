@@ -302,7 +302,7 @@ export function TaskModal({
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in" />
-        <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:max-h-[85vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl z-50 flex flex-col border border-gray-200 dark:border-gray-700 animate-scale-in">
+        <Dialog.Content className="fixed inset-0 sm:inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:max-h-[90vh] sm:max-h-[85vh] bg-white dark:bg-gray-900 sm:rounded-xl shadow-2xl z-50 flex flex-col border-0 sm:border border-gray-200 dark:border-gray-700 animate-scale-in overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -316,9 +316,9 @@ export function TaskModal({
           </div>
 
           {/* Content */}
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
             {/* Left Side - Form */}
-            <div className="flex-1 p-6 overflow-y-auto">
+            <div className="flex-1 p-4 sm:p-6 overflow-y-auto min-h-0">
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Title */}
                 <div>
@@ -536,7 +536,7 @@ export function TaskModal({
 
             {/* Right Side - Details (only for editing) */}
             {isEditing && taskDetails && (
-              <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
+              <div className="w-full md:w-80 md:min-w-[320px] border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50 max-h-[50vh] md:max-h-none overflow-hidden">
                 {/* Tabs */}
                 <div className="border-b border-gray-200 dark:border-gray-700">
                   <nav className="flex px-4" aria-label="Tabs">

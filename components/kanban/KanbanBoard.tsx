@@ -336,7 +336,7 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex space-x-6 h-full overflow-x-auto pb-4">
+        <div className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-mandatory sm:snap-none scroll-smooth">
           {workflowStages.map((stage) => (
             <KanbanColumn
               key={stage.id}

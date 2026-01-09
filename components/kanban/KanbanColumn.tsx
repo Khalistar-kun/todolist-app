@@ -59,7 +59,7 @@ export function KanbanColumn({
   }, [menuOpen])
 
   return (
-    <div className="flex-shrink-0 w-80">
+    <div className="flex-shrink-0 w-[85vw] sm:w-80 snap-start sm:snap-align-none">
       <div className="card h-full flex flex-col">
         {/* Column Header */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
