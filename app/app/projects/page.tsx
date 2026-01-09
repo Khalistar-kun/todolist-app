@@ -9,10 +9,54 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { format } from 'date-fns'
 
+/**
+ * ProjectsSkeleton - Neutral loading state for projects page
+ * Shows during auth loading AND data loading to prevent auth flash
+ */
+function ProjectsSkeleton() {
+  return (
+    <div className="px-4 py-6 sm:px-0 animate-fade-in">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+            <div className="h-4 w-80 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
+          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="h-2 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-5 w-16 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                </div>
+                <div className="h-4 w-full bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-2" />
+                <div className="h-4 w-3/4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />
+                <div className="flex items-center justify-between">
+                  <div className="flex -space-x-2">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse border-2 border-white dark:border-gray-800" />
+                    ))}
+                  </div>
+                  <div className="h-3 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProjectsPage() {
-  const { user } = useAuth()
+  // CRITICAL: Use status as primary auth indicator
+  const { user, status } = useAuth()
   const [projects, setProjects] = useState<ProjectWithMembers[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
 
   // Silent refetch for real-time updates
@@ -47,7 +91,7 @@ export default function ProjectsPage() {
     } catch (error) {
       console.error('Error fetching projects:', error)
     } finally {
-      setLoading(false)
+      setDataLoading(false)
     }
   }, [])
 
@@ -59,10 +103,24 @@ export default function ProjectsPage() {
     }
   }, [user, fetchProjects])
 
-  if (loading) {
+  // CRITICAL ORDER OF CHECKS:
+  // 1. Auth loading → show skeleton (neutral UI)
+  // 2. Data loading (when authenticated) → show skeleton
+  // 3. Unauthenticated → show login prompt
+  // 4. Authenticated with data → show content
+
+  if (status === 'loading') {
+    return <ProjectsSkeleton />
+  }
+
+  if (status === 'authenticated' && dataLoading) {
+    return <ProjectsSkeleton />
+  }
+
+  if (status === 'unauthenticated' || !user) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="spinner spinner-lg"></div>
+      <div className="text-center py-12 animate-fade-in">
+        <p className="text-gray-500 dark:text-gray-400">Please sign in to view your projects.</p>
       </div>
     )
   }

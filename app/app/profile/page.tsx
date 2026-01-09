@@ -12,9 +12,48 @@ interface Profile {
   bio: string | null
 }
 
+/**
+ * ProfileSkeleton - Neutral loading state for profile page
+ * Shows during auth loading AND data loading to prevent auth flash
+ */
+function ProfileSkeleton() {
+  return (
+    <div className="px-4 py-6 sm:px-0 animate-fade-in">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-8">
+          <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+          <div className="h-4 w-64 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+          <div className="flex items-center space-x-6">
+            <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+            <div className="flex-1 space-y-3">
+              <div className="h-8 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-4 w-48 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i}>
+                <div className="h-4 w-24 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-2" />
+                <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProfilePage() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
+  // CRITICAL: Use status as primary auth indicator
+  const { user, status } = useAuth()
+  const [dataLoading, setDataLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<Profile>({
     id: '',
@@ -28,7 +67,7 @@ export default function ProfilePage() {
     if (!user) return
 
     try {
-      setLoading(true)
+      setDataLoading(true)
 
       // Try to load from API first
       const response = await fetch('/api/profile')
@@ -78,7 +117,7 @@ export default function ProfilePage() {
         bio: '',
       })
     } finally {
-      setLoading(false)
+      setDataLoading(false)
     }
   }, [user])
 
@@ -168,14 +207,24 @@ export default function ProfilePage() {
     return user?.email?.charAt(0).toUpperCase() || 'U'
   }
 
-  if (loading) {
+  // CRITICAL ORDER OF CHECKS:
+  // 1. Auth loading → show skeleton (neutral UI)
+  // 2. Data loading (when authenticated) → show skeleton
+  // 3. Unauthenticated → redirect or show login prompt
+  // 4. Authenticated with data → show content
+
+  if (status === 'loading') {
+    return <ProfileSkeleton />
+  }
+
+  if (status === 'authenticated' && dataLoading) {
+    return <ProfileSkeleton />
+  }
+
+  if (status === 'unauthenticated' || !user) {
     return (
-      <div className="px-4 py-6 sm:px-0">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <div className="spinner spinner-lg"></div>
-          </div>
-        </div>
+      <div className="text-center py-12 animate-fade-in">
+        <p className="text-gray-500 dark:text-gray-400">Please sign in to view your profile.</p>
       </div>
     )
   }

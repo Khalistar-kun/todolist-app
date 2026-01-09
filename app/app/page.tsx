@@ -23,8 +23,64 @@ interface RecentTask extends Task {
 // Maximum time to wait for data before showing empty state
 const DATA_LOADING_TIMEOUT_MS = 15000
 
+/**
+ * DashboardSkeleton - Neutral loading state for dashboard
+ * Shows during auth loading AND data loading to prevent auth flash
+ */
+function DashboardSkeleton() {
+  return (
+    <div className="px-4 py-6 sm:px-0 animate-fade-in">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+          <div className="h-4 w-96 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+        </div>
+
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                <div className="ml-4 flex-1">
+                  <div className="h-3 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-2" />
+                  <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Content Grid Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {[...Array(3)].map((_, j) => (
+                  <div key={j} className="px-5 py-4 flex items-center gap-3">
+                    <div className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                    <div className="flex-1">
+                      <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+                      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
-  const { user, loading, status } = useAuth()
+  // CRITICAL: Use status as primary auth indicator, not loading boolean
+  const { user, status } = useAuth()
   const { playClick } = useSound()
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -194,68 +250,36 @@ export default function Dashboard() {
           clearTimeout(loadingTimeoutRef.current)
         }
       })
-    } else if (!loading) {
-      // No user and not loading = definitely not logged in
+    } else if (status === 'unauthenticated') {
+      // Confirmed not logged in - stop data loading
       setDataLoading(false)
     }
+    // Note: Don't set dataLoading=false when status === 'loading'
+    // This prevents showing unauthenticated UI during auth hydration
 
     return () => {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  }, [user, loading, fetchDashboardData, dataLoading])
+  }, [user, status, fetchDashboardData, dataLoading])
 
-  if (loading || dataLoading) {
-    return (
-      <div className="px-4 py-6 sm:px-0 animate-fade-in">
-        <div className="max-w-7xl mx-auto">
-          {/* Skeleton Header */}
-          <div className="mb-8">
-            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
-            <div className="h-4 w-96 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-          </div>
+  // CRITICAL ORDER OF CHECKS:
+  // 1. Auth loading → show skeleton (neutral UI)
+  // 2. Data loading (when authenticated) → show skeleton
+  // 3. Unauthenticated → show login prompt (only after auth is resolved)
+  // 4. Authenticated with data → show dashboard
 
-          {/* Skeleton Stats */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="card p-4">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-                  <div className="ml-4 flex-1">
-                    <div className="h-3 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-2" />
-                    <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Skeleton Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="card">
-                <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-                  <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                </div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {[...Array(3)].map((_, j) => (
-                    <div key={j} className="px-5 py-4 flex items-center gap-3">
-                      <div className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-                      <div className="flex-1">
-                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-                        <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+  // Check 1: Auth is still loading - show skeleton, never login UI
+  if (status === 'loading') {
+    return <DashboardSkeleton />
   }
+
+  // Check 2: Auth resolved, still loading data - show skeleton
+  if (status === 'authenticated' && dataLoading) {
+    return <DashboardSkeleton />
+  }
+
 
   // Show error state if loading timed out
   if (loadError) {

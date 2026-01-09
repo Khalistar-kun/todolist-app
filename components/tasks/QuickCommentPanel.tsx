@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Comment } from '@/lib/supabase'
 import { format } from 'date-fns'
@@ -43,18 +42,11 @@ export function QuickCommentPanel({
     if (!taskId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('comments')
-        .select(`
-          *,
-          author:profiles!comments_created_by_fkey(id, full_name, avatar_url)
-        `)
-        .eq('task_id', taskId)
-        .order('created_at', { ascending: true })
-        .limit(20)
+      const response = await fetch(`/api/comments?task_id=${taskId}`)
+      const data = await response.json()
 
-      if (error) throw error
-      setComments(data || [])
+      if (!response.ok) throw new Error(data.error || 'Failed to fetch comments')
+      setComments(data.comments || [])
     } catch (error) {
       console.error('[QuickCommentPanel] Error fetching comments:', error)
     } finally {
@@ -101,23 +93,21 @@ export function QuickCommentPanel({
 
     setSubmitting(true)
     try {
-      const { data, error } = await supabase
-        .from('comments')
-        .insert({
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           task_id: taskId,
           project_id: projectId,
           content: newComment.trim(),
-          created_by: user.id,
-        })
-        .select(`
-          *,
-          author:profiles!comments_created_by_fkey(id, full_name, avatar_url)
-        `)
-        .single()
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
 
-      setComments(prev => [...prev, data])
+      if (!response.ok) throw new Error(data.error || 'Failed to add comment')
+
+      setComments(prev => [...prev, data.comment])
       setNewComment('')
       toast.success('Comment added')
     } catch (error: any) {

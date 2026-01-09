@@ -22,9 +22,45 @@ interface OrganizationWithMembers extends Organization {
   members: TeamMember[]
 }
 
+/**
+ * TeamSkeleton - Neutral loading state for team page
+ * Shows during auth loading AND data loading to prevent auth flash
+ */
+function TeamSkeleton() {
+  return (
+    <div className="px-4 py-6 sm:px-0 animate-fade-in">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+          <div className="h-4 w-72 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+        </div>
+        <div className="space-y-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+              {[...Array(3)].map((_, j) => (
+                <div key={j} className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 last:border-0 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                  <div className="flex-1">
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+                    <div className="h-3 w-48 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TeamPage() {
   const router = useRouter()
-  const { user, loading } = useAuth()
+  // CRITICAL: Use status as primary auth indicator, not loading boolean
+  const { user, status } = useAuth()
   const { playClick, playSuccess } = useSound()
   const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -195,18 +231,21 @@ export default function TeamPage() {
     }
   }
 
-  if (loading || dataLoading) {
-    return (
-      <div className="flex items-center justify-center h-64 animate-fade-in">
-        <div className="flex flex-col items-center gap-3">
-          <div className="spinner spinner-lg"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading your team...</p>
-        </div>
-      </div>
-    )
+  // CRITICAL ORDER OF CHECKS:
+  // 1. Auth loading → show skeleton (neutral UI)
+  // 2. Data loading (when authenticated) → show skeleton
+  // 3. Unauthenticated → show login prompt (only after auth is resolved)
+  // 4. Authenticated with data → show content
+
+  if (status === 'loading') {
+    return <TeamSkeleton />
   }
 
-  if (!user) {
+  if (status === 'authenticated' && dataLoading) {
+    return <TeamSkeleton />
+  }
+
+  if (status === 'unauthenticated' || !user) {
     return (
       <div className="text-center py-12 animate-fade-in">
         <p className="text-gray-500 dark:text-gray-400">Please sign in to view your team.</p>

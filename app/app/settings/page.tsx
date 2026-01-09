@@ -32,12 +32,46 @@ const defaultSettings: Settings = {
   timezone: 'UTC',
 }
 
+/**
+ * SettingsSkeleton - Neutral loading state for settings page
+ * Shows during auth loading AND data loading to prevent auth flash
+ */
+function SettingsSkeleton() {
+  return (
+    <div className="px-4 py-6 sm:px-0 animate-fade-in">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-8">
+          <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+          <div className="h-4 w-72 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+        </div>
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+            <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+            <div className="space-y-4">
+              {[...Array(2)].map((_, j) => (
+                <div key={j} className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" />
+                    <div className="h-3 w-56 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                  </div>
+                  <div className="h-6 w-11 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
-  const { user } = useAuth()
+  // CRITICAL: Use status as primary auth indicator
+  const { user, status } = useAuth()
   const themeContext = useThemeSafe()
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<Settings>(defaultSettings)
-  const [loaded, setLoaded] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [loadingOrg, setLoadingOrg] = useState(true)
@@ -74,7 +108,7 @@ export default function SettingsPage() {
         }
       }
     } finally {
-      setLoaded(true)
+      setDataLoaded(true)
     }
   }, [user])
 
@@ -175,14 +209,24 @@ export default function SettingsPage() {
 
   const isDark = themeContext?.theme === 'dark'
 
-  if (!loaded) {
+  // CRITICAL ORDER OF CHECKS:
+  // 1. Auth loading → show skeleton (neutral UI)
+  // 2. Data loading (when authenticated) → show skeleton
+  // 3. Unauthenticated → show login prompt
+  // 4. Authenticated with data → show content
+
+  if (status === 'loading') {
+    return <SettingsSkeleton />
+  }
+
+  if (status === 'authenticated' && !dataLoaded) {
+    return <SettingsSkeleton />
+  }
+
+  if (status === 'unauthenticated' || !user) {
     return (
-      <div className="px-4 py-6 sm:px-0">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <div className="spinner spinner-lg"></div>
-          </div>
-        </div>
+      <div className="text-center py-12 animate-fade-in">
+        <p className="text-gray-500 dark:text-gray-400">Please sign in to view your settings.</p>
       </div>
     )
   }

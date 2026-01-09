@@ -49,10 +49,52 @@ interface Meeting {
   created_at: string
 }
 
+/**
+ * OrganizationDetailSkeleton - Neutral loading state for organization detail page
+ * Shows during auth loading AND data loading to prevent auth flash
+ */
+function OrganizationDetailSkeleton() {
+  return (
+    <div className="px-4 py-6 sm:px-0 animate-fade-in">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+          <div>
+            <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-2" />
+            <div className="h-4 w-64 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+          <div className="flex gap-8">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 ${i === 2 ? 'lg:col-span-2' : ''}`}>
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+              <div className="p-5 space-y-3">
+                {[...Array(3)].map((_, j) => (
+                  <div key={j} className="h-16 w-full bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function OrganizationDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { user, loading } = useAuth()
+  // CRITICAL: Use status as primary auth indicator, not loading boolean
+  const { user, status } = useAuth()
   const { playClick, playSuccess } = useSound()
 
   const [organization, setOrganization] = useState<Organization | null>(null)
@@ -290,18 +332,29 @@ export default function OrganizationDetailPage() {
     })
   }
 
-  if (loading || dataLoading) {
+  // CRITICAL ORDER OF CHECKS:
+  // 1. Auth loading → show skeleton (neutral UI)
+  // 2. Data loading (when authenticated) → show skeleton
+  // 3. Unauthenticated → show login prompt
+  // 4. Authenticated with data → show content
+
+  if (status === 'loading') {
+    return <OrganizationDetailSkeleton />
+  }
+
+  if (status === 'authenticated' && dataLoading) {
+    return <OrganizationDetailSkeleton />
+  }
+
+  if (status === 'unauthenticated' || !user) {
     return (
-      <div className="flex items-center justify-center h-64 animate-fade-in">
-        <div className="flex flex-col items-center gap-3">
-          <div className="spinner spinner-lg"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading organization...</p>
-        </div>
+      <div className="text-center py-12 animate-fade-in">
+        <p className="text-gray-500 dark:text-gray-400">Please sign in to view this organization.</p>
       </div>
     )
   }
 
-  if (!user || !organization) {
+  if (!organization) {
     return (
       <div className="text-center py-12 animate-fade-in">
         <p className="text-gray-500 dark:text-gray-400">Organization not found.</p>
