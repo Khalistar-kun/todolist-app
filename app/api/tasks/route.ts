@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
     // Build query with pagination
     let query = supabaseAdmin
       .from('tasks')
-      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by, color, project_id', { count: 'exact' })
+      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by, color, project_id, approval_status', { count: 'exact' })
       .eq('project_id', projectId)
       .order('position', { ascending: true })
       .range(offset, offset + limit - 1)

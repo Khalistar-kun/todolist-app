@@ -43,6 +43,7 @@ interface KanbanBoardProps {
   onTaskApprove?: (task: Task) => void
   onTaskReject?: (task: Task) => void
   canApprove?: boolean
+  filterPendingApproval?: boolean
 }
 
 export function KanbanBoard({
@@ -61,11 +62,25 @@ export function KanbanBoard({
   onTaskApprove,
   onTaskReject,
   canApprove = false,
+  filterPendingApproval = false,
 }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set())
   const [localSortedTasks, setLocalSortedTasks] = useState<Record<string, Task[]>>({})
+
+  // Define workflow stages early so they can be used in callbacks
+  const workflowStages = project.workflow_stages || [
+    { id: 'todo', name: 'To Do', color: '#6B7280' },
+    { id: 'in_progress', name: 'In Progress', color: '#3B82F6' },
+    { id: 'review', name: 'Review', color: '#F59E0B' },
+    { id: 'done', name: 'Done', color: '#10B981' },
+  ]
+
+  // Find the "Done" stage ID - could be 'done' or have a different ID in custom workflows
+  const doneStage = workflowStages.find((s) => s.id === 'done' || s.name?.toLowerCase() === 'done')
+    || workflowStages[workflowStages.length - 1]
+  const doneStageId = doneStage?.id || 'done'
 
   // Toggle column collapse
   const handleCollapseColumn = useCallback((stageId: string) => {
@@ -126,9 +141,22 @@ export function KanbanBoard({
   }, [tasks, onSortColumn, onReorder])
 
   // Get tasks for a stage (use local sorted if available, otherwise props)
+  // When filterPendingApproval is true, only show tasks in Done with pending approval
   const getTasksForStage = useCallback((stageId: string): Task[] => {
-    return localSortedTasks[stageId] || tasks[stageId] || []
-  }, [localSortedTasks, tasks])
+    let stageTasks = localSortedTasks[stageId] || tasks[stageId] || []
+
+    // If filtering for pending approval, only show pending tasks in Done column
+    if (filterPendingApproval) {
+      if (stageId === doneStageId) {
+        stageTasks = stageTasks.filter(t => t.approval_status === 'pending')
+      } else {
+        // Hide tasks in other columns when filtering
+        stageTasks = []
+      }
+    }
+
+    return stageTasks
+  }, [localSortedTasks, tasks, filterPendingApproval, doneStageId])
 
   // Clear local sort when tasks change
   useEffect(() => {
@@ -221,18 +249,6 @@ export function KanbanBoard({
       clearSelection()
     }
   }, [onBulkDelete, selectedTaskIds, clearSelection])
-
-  const workflowStages = project.workflow_stages || [
-    { id: 'todo', name: 'To Do', color: '#6B7280' },
-    { id: 'in_progress', name: 'In Progress', color: '#3B82F6' },
-    { id: 'review', name: 'Review', color: '#F59E0B' },
-    { id: 'done', name: 'Done', color: '#10B981' },
-  ]
-
-  // Find the "Done" stage ID - could be 'done' or have a different ID in custom workflows
-  const doneStage = workflowStages.find((s) => s.id === 'done' || s.name?.toLowerCase() === 'done')
-    || workflowStages[workflowStages.length - 1]
-  const doneStageId = doneStage?.id || 'done'
 
   // Drag-to-scroll functionality for the kanban board
   const scrollContainerRef = useRef<HTMLDivElement>(null)

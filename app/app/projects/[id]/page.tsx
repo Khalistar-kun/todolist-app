@@ -31,6 +31,7 @@ export default function ProjectPage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false)
   const [defaultStageId, setDefaultStageId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('board')
+  const [showPendingOnly, setShowPendingOnly] = useState(false)
 
   const { permissions, loading: permissionsLoading } = useProjectPermissions(projectId)
   const isInitialLoadRef = useRef(true)
@@ -583,12 +584,28 @@ export default function ProjectPage() {
               {project.completed_tasks_count} completed
             </div>
             {(project.pending_approval_count || 0) > 0 && (
-              <div className="flex items-center text-yellow-600 dark:text-yellow-400">
+              <button
+                onClick={() => {
+                  setShowPendingOnly(!showPendingOnly)
+                  setActiveTab('board')
+                }}
+                className={`flex items-center transition-colors ${
+                  showPendingOnly
+                    ? 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900/40 px-2 py-0.5 rounded-full'
+                    : 'text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300'
+                }`}
+                title={showPendingOnly ? 'Click to show all tasks' : 'Click to filter pending approval tasks'}
+              >
                 <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {project.pending_approval_count} pending approval
-              </div>
+                {showPendingOnly && (
+                  <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </button>
             )}
             <div className="flex items-center">
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -648,6 +665,24 @@ export default function ProjectPage() {
         {/* Tab Content */}
         {activeTab === 'board' && (
           <>
+            {/* Pending Approval Filter Banner */}
+            {showPendingOnly && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center justify-between">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  <svg className="w-4 h-4 inline mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                  </svg>
+                  Showing only tasks pending approval
+                </p>
+                <button
+                  onClick={() => setShowPendingOnly(false)}
+                  className="text-sm text-yellow-700 dark:text-yellow-300 hover:text-yellow-800 dark:hover:text-yellow-200 font-medium"
+                >
+                  Clear filter
+                </button>
+              </div>
+            )}
+
             {/* Kanban Board */}
             <KanbanBoard
               project={project}
@@ -663,6 +698,7 @@ export default function ProjectPage() {
               onTaskApprove={permissions.canManageMembers ? handleTaskApprove : undefined}
               onTaskReject={permissions.canManageMembers ? handleTaskReject : undefined}
               canApprove={permissions.canManageMembers}
+              filterPendingApproval={showPendingOnly}
             />
 
             {/* Read-only notice for viewers */}
