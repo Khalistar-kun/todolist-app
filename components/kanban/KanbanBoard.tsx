@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -229,6 +229,56 @@ export function KanbanBoard({
     { id: 'done', name: 'Done', color: '#10B981' },
   ]
 
+  // Find the "Done" stage ID - could be 'done' or have a different ID in custom workflows
+  const doneStage = workflowStages.find((s) => s.id === 'done' || s.name?.toLowerCase() === 'done')
+    || workflowStages[workflowStages.length - 1]
+  const doneStageId = doneStage?.id || 'done'
+
+  // Drag-to-scroll functionality for the kanban board
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [isDraggingScroll, setIsDraggingScroll] = useState(false)
+  const [scrollStartX, setScrollStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Only initiate drag-to-scroll if clicking on the container itself (not on cards)
+    const target = e.target as HTMLElement
+    if (target.closest('.card') || target.closest('button') || target.closest('[data-draggable]')) {
+      return
+    }
+
+    if (scrollContainerRef.current) {
+      setIsDraggingScroll(true)
+      setScrollStartX(e.pageX - scrollContainerRef.current.offsetLeft)
+      setScrollLeft(scrollContainerRef.current.scrollLeft)
+      scrollContainerRef.current.style.cursor = 'grabbing'
+    }
+  }, [])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingScroll || !scrollContainerRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollContainerRef.current.offsetLeft
+    const walk = (x - scrollStartX) * 1.5 // Multiply for faster scrolling
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk
+  }, [isDraggingScroll, scrollStartX, scrollLeft])
+
+  const handleMouseUp = useCallback(() => {
+    setIsDraggingScroll(false)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = 'grab'
+    }
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    if (isDraggingScroll) {
+      setIsDraggingScroll(false)
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.cursor = 'grab'
+      }
+    }
+  }, [isDraggingScroll])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -422,7 +472,14 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-mandatory sm:snap-none scroll-smooth">
+        <div
+          ref={scrollContainerRef}
+          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-mandatory sm:snap-none scroll-smooth cursor-grab select-none"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        >
           {workflowStages.map((stage) => (
             <KanbanColumn
               key={stage.id}
@@ -437,6 +494,7 @@ export function KanbanBoard({
               onTaskApprove={onTaskApprove}
               onTaskReject={onTaskReject}
               canApprove={canApprove}
+              doneStageId={doneStageId}
               selectedTaskIds={selectedTaskIds}
               onTaskSelect={handleTaskSelect}
               onAddTask={onAddTask}

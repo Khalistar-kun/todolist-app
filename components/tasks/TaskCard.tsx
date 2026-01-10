@@ -20,6 +20,7 @@ interface TaskCardProps {
   onApprove?: (task: Task) => void
   onReject?: (task: Task) => void
   canApprove?: boolean
+  doneStageId?: string
   isDragging?: boolean
   isSelected?: boolean
   onSelect?: (taskId: string, ctrlKey: boolean) => void
@@ -48,6 +49,7 @@ export function TaskCard({
   onApprove,
   onReject,
   canApprove = false,
+  doneStageId = 'done',
   isDragging = false,
   isSelected = false,
   onSelect,
@@ -264,7 +266,7 @@ export function TaskCard({
             </span>
           )}
           {/* Approval Status Badge */}
-          {task.stage_id === 'done' && task.approval_status === 'pending' && (
+          {task.stage_id === doneStageId && task.approval_status === 'pending' && (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
               <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -429,7 +431,7 @@ export function TaskCard({
       )}
 
       {/* Approval Actions - Show for tasks pending approval when user can approve */}
-      {canApprove && task.stage_id === 'done' && task.approval_status === 'pending' && (
+      {canApprove && task.stage_id === doneStageId && task.approval_status === 'pending' && (
         <div className="flex items-center gap-2 mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
           <span className="text-xs text-yellow-700 dark:text-yellow-300 flex-1">Needs approval</span>
           <button

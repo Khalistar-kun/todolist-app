@@ -22,6 +22,7 @@ interface KanbanColumnProps {
   onTaskApprove?: (task: Task) => void
   onTaskReject?: (task: Task) => void
   canApprove?: boolean
+  doneStageId?: string
   selectedTaskIds?: Set<string>
   onTaskSelect?: (taskId: string, ctrlKey: boolean) => void
   onAddTask?: (stageId: string) => void
@@ -43,6 +44,7 @@ export function KanbanColumn({
   onTaskApprove,
   onTaskReject,
   canApprove = false,
+  doneStageId = 'done',
   selectedTaskIds,
   onTaskSelect,
   onAddTask,
@@ -203,6 +205,7 @@ export function KanbanColumn({
                     onApprove={onTaskApprove}
                     onReject={onTaskReject}
                     canApprove={canApprove}
+                    doneStageId={doneStageId}
                     isSelected={selectedTaskIds?.has(task.id) || false}
                     onSelect={onTaskSelect}
                   />
