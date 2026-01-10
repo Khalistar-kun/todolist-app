@@ -38,6 +38,7 @@ export function QuickCommentPanel({
   const [submitting, setSubmitting] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const mentionDropdownRef = useRef<HTMLDivElement>(null)
 
   // Mention autocomplete
   const mention = useMentionAutocomplete(newComment, {
@@ -74,12 +75,36 @@ export function QuickCommentPanel({
     if (!isOpen) return
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose()
+      const target = e.target as Node
+
+      // Don't close if clicking inside the panel
+      if (panelRef.current && panelRef.current.contains(target)) {
+        return
       }
+
+      // Don't close if clicking inside the mention dropdown (rendered via portal)
+      if (mentionDropdownRef.current && mentionDropdownRef.current.contains(target)) {
+        return
+      }
+
+      // Don't close if the mention dropdown is open and the click target is part of it
+      // This handles the case where the ref might not be set yet
+      const mentionDropdown = document.querySelector('[data-mention-dropdown="true"]')
+      if (mentionDropdown && mentionDropdown.contains(target)) {
+        return
+      }
+
+      onClose()
     }
 
     const handleEscape = (e: KeyboardEvent) => {
+      // If mention dropdown is open, close it first, not the panel
+      if (mention.isOpen) {
+        mention.close()
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
       if (e.key === 'Escape') {
         onClose()
       }
@@ -92,7 +117,7 @@ export function QuickCommentPanel({
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, mention])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -304,13 +329,15 @@ export function QuickCommentPanel({
                 const result = mention.selectUser(user)
                 if (result) {
                   setNewComment(result.text)
-                  setTimeout(() => {
+                  // Use requestAnimationFrame to ensure state update completes before focusing
+                  requestAnimationFrame(() => {
                     inputRef.current?.focus()
                     inputRef.current?.setSelectionRange(result.newCursorPosition, result.newCursorPosition)
-                  }, 0)
+                  })
                 }
               }}
               anchorRef={inputRef}
+              dropdownRef={mentionDropdownRef}
             />
           )}
           <div className="flex items-center justify-between mt-2">

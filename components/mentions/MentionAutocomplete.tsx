@@ -14,6 +14,8 @@ interface MentionAutocompleteProps {
   anchorRef?: React.RefObject<HTMLElement | null>
   // For positioning based on caret position
   caretPosition?: { top: number; left: number }
+  // Ref to expose dropdown element for outside-click detection
+  dropdownRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export function MentionAutocomplete({
@@ -24,8 +26,10 @@ export function MentionAutocomplete({
   onSelect,
   anchorRef,
   caretPosition,
+  dropdownRef,
 }: MentionAutocompleteProps) {
-  const listRef = useRef<HTMLDivElement>(null)
+  const internalRef = useRef<HTMLDivElement>(null)
+  const listRef = dropdownRef || internalRef
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const [mounted, setMounted] = useState(false)
 
@@ -102,6 +106,7 @@ export function MentionAutocomplete({
   const dropdown = (
     <div
       ref={listRef}
+      data-mention-dropdown="true"
       style={{
         position: 'fixed',
         top: position.top,
@@ -109,7 +114,15 @@ export function MentionAutocomplete({
         zIndex: 99999,
       }}
       className="w-64 max-h-80 overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700"
-      onMouseDown={(e) => e.preventDefault()} // Prevent blur on input when clicking dropdown
+      onMouseDown={(e) => {
+        // CRITICAL: Prevent blur on input and stop propagation to parent handlers
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      onClick={(e) => {
+        // Stop click from bubbling to outside-click handlers
+        e.stopPropagation()
+      }}
     >
       {isLoading ? (
         <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
@@ -126,7 +139,16 @@ export function MentionAutocomplete({
             <button
               key={user.id}
               data-index={index}
-              onClick={() => onSelect(user)}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onSelect(user)
+              }}
+              onMouseDown={(e) => {
+                // Prevent blur and any parent mousedown handlers
+                e.preventDefault()
+                e.stopPropagation()
+              }}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors ${
                 index === selectedIndex
                   ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'

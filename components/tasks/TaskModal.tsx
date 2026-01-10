@@ -93,6 +93,8 @@ export function TaskModal({
   // Refs for mention autocomplete positioning
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null)
   const subtaskInputRef = useRef<HTMLInputElement>(null)
+  const commentMentionDropdownRef = useRef<HTMLDivElement>(null)
+  const subtaskMentionDropdownRef = useRef<HTMLDivElement>(null)
 
   // Mention autocomplete for comments
   const commentMention = useMentionAutocomplete(newComment, {
@@ -714,13 +716,14 @@ export function TaskModal({
                               const result = subtaskMention.selectUser(user)
                               if (result) {
                                 setNewSubtask(result.text)
-                                setTimeout(() => {
+                                requestAnimationFrame(() => {
                                   subtaskInputRef.current?.focus()
                                   subtaskInputRef.current?.setSelectionRange(result.newCursorPosition, result.newCursorPosition)
-                                }, 0)
+                                })
                               }
                             }}
                             anchorRef={subtaskInputRef}
+                            dropdownRef={subtaskMentionDropdownRef}
                           />
                         )}
                       </div>
@@ -786,13 +789,14 @@ export function TaskModal({
                               if (result) {
                                 setNewComment(result.text)
                                 // Focus back and set cursor position
-                                setTimeout(() => {
+                                requestAnimationFrame(() => {
                                   commentTextareaRef.current?.focus()
                                   commentTextareaRef.current?.setSelectionRange(result.newCursorPosition, result.newCursorPosition)
-                                }, 0)
+                                })
                               }
                             }}
                             anchorRef={commentTextareaRef}
+                            dropdownRef={commentMentionDropdownRef}
                           />
                         )}
                         <button
