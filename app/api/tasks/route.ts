@@ -466,24 +466,33 @@ export async function PATCH(request: NextRequest) {
         // Don't fail the request if notification fails
         console.error('[API] Error sending task move notifications:', notifyError)
       }
-    } else if (Object.keys(filteredUpdates).length > 1) {
-      // Send Slack notification for general updates (not just timestamp)
-      sendSlackNotification(supabaseAdmin, existingTask.project_id, 'update', {
-        text: `Task updated: ${existingTask.title}`,
-        blocks: [
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: 'Task Updated', emoji: true },
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*${task.title}*`,
+    } else {
+      // Check if there are meaningful updates worth notifying about
+      // Exclude: color (visual-only), updated_at (always set)
+      const visualOnlyFields = ['color', 'updated_at']
+      const meaningfulUpdates = Object.keys(filteredUpdates).filter(
+        key => !visualOnlyFields.includes(key)
+      )
+
+      // Only send Slack notification for meaningful updates (not color changes)
+      if (meaningfulUpdates.length > 0) {
+        sendSlackNotification(supabaseAdmin, existingTask.project_id, 'update', {
+          text: `Task updated: ${existingTask.title}`,
+          blocks: [
+            {
+              type: 'header',
+              text: { type: 'plain_text', text: 'Task Updated', emoji: true },
             },
-          },
-        ],
-      })
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*${task.title}*`,
+              },
+            },
+          ],
+        })
+      }
     }
 
     return NextResponse.json({ task })
