@@ -19,6 +19,9 @@ interface KanbanColumnProps {
   onTaskDelete?: (task: Task) => void
   onTaskDuplicate?: (task: Task) => void
   onTaskColorChange?: (task: Task, color: string | null) => void
+  onTaskApprove?: (task: Task) => void
+  onTaskReject?: (task: Task) => void
+  canApprove?: boolean
   selectedTaskIds?: Set<string>
   onTaskSelect?: (taskId: string, ctrlKey: boolean) => void
   onAddTask?: (stageId: string) => void
@@ -37,6 +40,9 @@ export function KanbanColumn({
   onTaskDelete,
   onTaskDuplicate,
   onTaskColorChange,
+  onTaskApprove,
+  onTaskReject,
+  canApprove = false,
   selectedTaskIds,
   onTaskSelect,
   onAddTask,
@@ -194,6 +200,9 @@ export function KanbanColumn({
                     onDelete={onTaskDelete}
                     onDuplicate={onTaskDuplicate}
                     onColorChange={onTaskColorChange}
+                    onApprove={onTaskApprove}
+                    onReject={onTaskReject}
+                    canApprove={canApprove}
                     isSelected={selectedTaskIds?.has(task.id) || false}
                     onSelect={onTaskSelect}
                   />

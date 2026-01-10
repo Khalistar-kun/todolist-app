@@ -194,6 +194,13 @@ export type Database = {
           tags: string[]
           custom_fields: Record<string, any>
           color: string | null
+          // Approval workflow fields
+          approval_status: 'none' | 'pending' | 'approved' | 'rejected'
+          approved_at: string | null
+          approved_by: string | null
+          rejection_reason: string | null
+          moved_to_done_at: string | null
+          moved_to_done_by: string | null
         }
         Insert: {
           project_id: string
@@ -222,6 +229,13 @@ export type Database = {
           tags?: string[]
           custom_fields?: Record<string, any>
           color?: string | null
+          // Approval workflow fields
+          approval_status?: 'none' | 'pending' | 'approved' | 'rejected'
+          approved_at?: string | null
+          approved_by?: string | null
+          rejection_reason?: string | null
+          moved_to_done_at?: string | null
+          moved_to_done_by?: string | null
         }
       }
       task_assignments: {

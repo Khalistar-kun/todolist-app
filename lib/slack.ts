@@ -276,12 +276,14 @@ export async function notifyTaskDeleted(
 
 /**
  * Notify about status change (special case for drag & drop)
+ * NOTE: For tasks moving to Done, this will show "Pending Approval" not "Completed"
  */
 export async function notifyStatusChanged(
   config: SlackConfig,
   task: Task,
   oldStatus: TaskStatus,
-  newStatus: TaskStatus
+  newStatus: TaskStatus,
+  movedBy?: string
 ): Promise<SlackMessageResponse> {
   const useThread = shouldUseThread(task)
   const threadTs = useThread ? (task.slack_thread_ts || undefined) : undefined
@@ -289,15 +291,26 @@ export async function notifyStatusChanged(
   const statusEmoji = {
     todo: '⏳',
     in_progress: '🔄',
-    done: '✅'
+    review: '👁️',
+    done: '⏰'  // Clock for pending, not checkmark
   }
 
-  const blocks = [
+  // If moving to done, show as pending approval, not completed
+  const isDone = newStatus === 'done'
+  const headerText = isDone
+    ? '⏰ Task Marked as Done (Pending Approval)'
+    : `📋 Task Moved to ${newStatus.replace('_', ' ').toUpperCase()}`
+
+  const statusText = isDone
+    ? `${statusEmoji[oldStatus] || '📋'} ${(oldStatus || 'unknown').replace('_', ' ')} → ⏰ Done (Pending Approval)`
+    : `${statusEmoji[oldStatus] || '📋'} ${(oldStatus || 'unknown').replace('_', ' ')} → ${statusEmoji[newStatus] || '📋'} ${newStatus.replace('_', ' ')}`
+
+  const blocks: any[] = [
     {
       type: 'header',
       text: {
         type: 'plain_text',
-        text: `📋 Task Moved to ${newStatus.replace('_', ' ').toUpperCase()}`,
+        text: headerText,
         emoji: true,
       },
     },
@@ -305,15 +318,169 @@ export async function notifyStatusChanged(
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${task.title}*\n\n${statusEmoji[oldStatus]} ${oldStatus.replace('_', ' ')} → ${statusEmoji[newStatus]} ${newStatus.replace('_', ' ')}`,
+        text: `*${task.title}*\n\n${statusText}`,
       },
+    },
+  ]
+
+  // Add who moved it if available
+  if (movedBy) {
+    blocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `Moved by: ${movedBy}`,
+        },
+      ],
+    })
+  }
+
+  // Add note about approval for done tasks
+  if (isDone) {
+    blocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: '⚠️ _This task requires owner/admin approval to be marked as completed._',
+        },
+      ],
+    })
+  }
+
+  return sendSlackMessage(
+    config.access_token,
+    config.channel_id,
+    isDone
+      ? `⏰ Task marked as done (pending approval): ${task.title}`
+      : `📋 Task moved to ${newStatus.replace('_', ' ')}: ${task.title}`,
+    blocks,
+    threadTs
+  )
+}
+
+/**
+ * Notify about task approval
+ */
+export async function notifyTaskApproved(
+  config: SlackConfig,
+  task: Task,
+  approvedBy: string,
+  projectName?: string
+): Promise<SlackMessageResponse> {
+  const useThread = shouldUseThread(task)
+  const threadTs = useThread ? (task.slack_thread_ts || undefined) : undefined
+
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: '✅ Task Approved and Completed',
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        {
+          type: 'mrkdwn',
+          text: `*Task:*\n${task.title}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Project:*\n${projectName || 'Unknown'}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Approved by:*\n${approvedBy}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Approved at:*\n${new Date().toLocaleString()}`,
+        },
+      ],
+    },
+    {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: '✅ _This task is now included in the completed count._',
+        },
+      ],
     },
   ]
 
   return sendSlackMessage(
     config.access_token,
     config.channel_id,
-    `📋 Task moved to ${newStatus.replace('_', ' ')}: ${task.title}`,
+    `✅ Task approved and completed: ${task.title}`,
+    blocks,
+    threadTs
+  )
+}
+
+/**
+ * Notify about task rejection
+ */
+export async function notifyTaskRejected(
+  config: SlackConfig,
+  task: Task,
+  rejectedBy: string,
+  reason?: string,
+  returnStage?: string,
+  projectName?: string
+): Promise<SlackMessageResponse> {
+  const useThread = shouldUseThread(task)
+  const threadTs = useThread ? (task.slack_thread_ts || undefined) : undefined
+
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: '❌ Task Rejected',
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        {
+          type: 'mrkdwn',
+          text: `*Task:*\n${task.title}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Project:*\n${projectName || 'Unknown'}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Rejected by:*\n${rejectedBy}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Reason:*\n${reason || 'No reason provided'}`,
+        },
+      ],
+    },
+    {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `📋 _Task has been returned to ${returnStage?.replace('_', ' ') || 'Review'} for further work._`,
+        },
+      ],
+    },
+  ]
+
+  return sendSlackMessage(
+    config.access_token,
+    config.channel_id,
+    `❌ Task rejected: ${task.title}`,
     blocks,
     threadTs
   )

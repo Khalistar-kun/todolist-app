@@ -75,10 +75,10 @@ export async function GET(
         .select('id, role, joined_at, user_id')
         .eq('project_id', projectId),
 
-      // Get task status counts
+      // Get task stage_id and approval_status for completed count
       supabaseAdmin
         .from('tasks')
-        .select('status')
+        .select('stage_id, approval_status')
         .eq('project_id', projectId)
     ])
 
@@ -117,7 +117,25 @@ export async function GET(
     )
 
     const tasksCount = tasks?.length || 0
-    const completedTasksCount = tasks?.filter(t => t.status === 'done').length || 0
+    // Find the "Done" stage - it's typically the last stage or has id 'done'
+    const workflowStages = project.workflow_stages || [
+      { id: 'todo', name: 'To Do', color: '#6B7280' },
+      { id: 'in_progress', name: 'In Progress', color: '#3B82F6' },
+      { id: 'review', name: 'Review', color: '#F59E0B' },
+      { id: 'done', name: 'Done', color: '#10B981' },
+    ]
+    // The "Done" stage is either explicitly named 'done' or is the last stage
+    const doneStage = workflowStages.find((s: any) => s.id === 'done' || s.name?.toLowerCase() === 'done')
+      || workflowStages[workflowStages.length - 1]
+    const doneStageId = doneStage?.id || 'done'
+    // Only count tasks in Done stage that are APPROVED as completed
+    const completedTasksCount = tasks?.filter(t =>
+      t.stage_id === doneStageId && t.approval_status === 'approved'
+    ).length || 0
+    // Count tasks pending approval (in Done but not yet approved)
+    const pendingApprovalCount = tasks?.filter(t =>
+      t.stage_id === doneStageId && t.approval_status === 'pending'
+    ).length || 0
 
     return NextResponse.json({
       project: {
@@ -125,6 +143,7 @@ export async function GET(
         members: memberProfiles,
         tasks_count: tasksCount,
         completed_tasks_count: completedTasksCount,
+        pending_approval_count: pendingApprovalCount,
       }
     })
   } catch (error) {

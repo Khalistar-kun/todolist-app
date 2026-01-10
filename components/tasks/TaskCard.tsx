@@ -17,6 +17,9 @@ interface TaskCardProps {
   onDelete?: (task: Task) => void
   onDuplicate?: (task: Task) => void
   onColorChange?: (task: Task, color: string | null) => void
+  onApprove?: (task: Task) => void
+  onReject?: (task: Task) => void
+  canApprove?: boolean
   isDragging?: boolean
   isSelected?: boolean
   onSelect?: (taskId: string, ctrlKey: boolean) => void
@@ -42,6 +45,9 @@ export function TaskCard({
   onDelete,
   onDuplicate,
   onColorChange,
+  onApprove,
+  onReject,
+  canApprove = false,
   isDragging = false,
   isSelected = false,
   onSelect,
@@ -145,6 +151,20 @@ export function TaskCard({
     onColorChange?.(task, color)
   }, [task, onColorChange])
 
+  // Handle approve
+  const handleApprove = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onApprove?.(task)
+  }, [task, onApprove])
+
+  // Handle reject
+  const handleReject = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onReject?.(task)
+  }, [task, onReject])
+
   // Main card click - opens task detail
   const handleCardClick = (e: React.MouseEvent) => {
     // Check if Ctrl key is held for multi-select
@@ -230,10 +250,10 @@ export function TaskCard({
         </div>
       )}
 
-      {/* Header with priority and actions */}
+      {/* Header with priority, approval status, and actions */}
       <div className="flex items-start justify-between mb-3">
-        {/* Priority Badge */}
-        <div className="flex-1">
+        {/* Priority Badge + Approval Status */}
+        <div className="flex-1 flex flex-wrap gap-1">
           {task.priority !== 'none' && (
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getPriorityColor(
@@ -241,6 +261,23 @@ export function TaskCard({
               )}`}
             >
               {getPriorityLabel(task.priority)}
+            </span>
+          )}
+          {/* Approval Status Badge */}
+          {task.stage_id === 'done' && task.approval_status === 'pending' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
+              <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Pending Approval
+            </span>
+          )}
+          {task.approval_status === 'approved' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800">
+              <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Approved
             </span>
           )}
         </div>
@@ -388,6 +425,33 @@ export function TaskCard({
           {task.tags.length > 3 && (
             <span className="text-xs text-gray-500 dark:text-gray-400">+{task.tags.length - 3}</span>
           )}
+        </div>
+      )}
+
+      {/* Approval Actions - Show for tasks pending approval when user can approve */}
+      {canApprove && task.stage_id === 'done' && task.approval_status === 'pending' && (
+        <div className="flex items-center gap-2 mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <span className="text-xs text-yellow-700 dark:text-yellow-300 flex-1">Needs approval</span>
+          <button
+            onClick={handleApprove}
+            className="px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors flex items-center gap-1"
+            title="Approve task"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            Approve
+          </button>
+          <button
+            onClick={handleReject}
+            className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors flex items-center gap-1"
+            title="Reject task"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Reject
+          </button>
         </div>
       )}
 

@@ -399,6 +399,100 @@ export default function ProjectPage() {
     }
   }
 
+  // Handler for approving a task
+  const handleTaskApprove = async (task: Task) => {
+    if (!permissions.canManageMembers) {
+      toast.error('Only owners or admins can approve tasks')
+      return
+    }
+
+    // Optimistic update
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const newTasks = { ...prev }
+      for (const stageId of Object.keys(newTasks)) {
+        newTasks[stageId] = newTasks[stageId].map(t =>
+          t.id === task.id ? { ...t, approval_status: 'approved' as const, approved_at: new Date().toISOString() } : t
+        )
+      }
+      return newTasks
+    })
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to approve task')
+      }
+      toast.success('Task approved!')
+      // Refresh to update counts
+      fetchProjectData()
+    } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
+      toast.error(error.message || 'Failed to approve task')
+    }
+  }
+
+  // Handler for rejecting a task
+  const handleTaskReject = async (task: Task) => {
+    if (!permissions.canManageMembers) {
+      toast.error('Only owners or admins can reject tasks')
+      return
+    }
+
+    const reason = prompt('Reason for rejection (optional):')
+
+    // Optimistic update - move back to review
+    const previousTasks = { ...tasks }
+    setTasks(prev => {
+      const newTasks: Record<string, Task[]> = {}
+      let rejectedTask: Task | null = null
+
+      // Remove from done stage
+      for (const stageId of Object.keys(prev)) {
+        if (stageId === 'done') {
+          newTasks[stageId] = prev[stageId].filter(t => {
+            if (t.id === task.id) {
+              rejectedTask = { ...t, stage_id: 'review', approval_status: 'rejected' as const, rejection_reason: reason || null }
+              return false
+            }
+            return true
+          })
+        } else {
+          newTasks[stageId] = [...prev[stageId]]
+        }
+      }
+
+      // Add to review stage
+      if (rejectedTask) {
+        if (!newTasks['review']) newTasks['review'] = []
+        newTasks['review'] = [...newTasks['review'], rejectedTask]
+      }
+
+      return newTasks
+    })
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, returnStageId: 'review' }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to reject task')
+      }
+      toast.success('Task rejected and returned to Review')
+    } catch (error: any) {
+      // Rollback on error
+      setTasks(previousTasks)
+      toast.error(error.message || 'Failed to reject task')
+    }
+  }
+
   if (loading || permissionsLoading) {
     return (
       <div className="px-4 py-6 sm:px-0">
@@ -477,19 +571,27 @@ export default function ProjectPage() {
           </div>
 
           {/* Project Stats */}
-          <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
             <div className="flex items-center">
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               {project.tasks_count} tasks
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center text-green-600 dark:text-green-400">
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {project.completed_tasks_count} completed
             </div>
+            {(project.pending_approval_count || 0) > 0 && (
+              <div className="flex items-center text-yellow-600 dark:text-yellow-400">
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {project.pending_approval_count} pending approval
+              </div>
+            )}
             <div className="flex items-center">
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -560,6 +662,9 @@ export default function ProjectPage() {
               onTaskDelete={permissions.canEdit ? handleTaskDelete : undefined}
               onTaskDuplicate={permissions.canEdit ? handleTaskDuplicate : undefined}
               onTaskColorChange={permissions.canEdit ? handleTaskColorChange : undefined}
+              onTaskApprove={permissions.canManageMembers ? handleTaskApprove : undefined}
+              onTaskReject={permissions.canManageMembers ? handleTaskReject : undefined}
+              canApprove={permissions.canManageMembers}
             />
 
             {/* Read-only notice for viewers */}

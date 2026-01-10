@@ -37,6 +37,7 @@ export interface ProjectWithMembers extends Project {
   })[]
   tasks_count: number
   completed_tasks_count: number
+  pending_approval_count?: number
 }
 
 export class ProjectService {

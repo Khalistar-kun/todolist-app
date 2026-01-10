@@ -40,6 +40,9 @@ interface KanbanBoardProps {
   onTaskDelete?: (task: Task) => void
   onTaskDuplicate?: (task: Task) => void
   onTaskColorChange?: (task: Task, color: string | null) => void
+  onTaskApprove?: (task: Task) => void
+  onTaskReject?: (task: Task) => void
+  canApprove?: boolean
 }
 
 export function KanbanBoard({
@@ -55,6 +58,9 @@ export function KanbanBoard({
   onTaskDelete,
   onTaskDuplicate,
   onTaskColorChange,
+  onTaskApprove,
+  onTaskReject,
+  canApprove = false,
 }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
@@ -428,6 +434,9 @@ export function KanbanBoard({
               onTaskDelete={onTaskDelete}
               onTaskDuplicate={onTaskDuplicate}
               onTaskColorChange={onTaskColorChange}
+              onTaskApprove={onTaskApprove}
+              onTaskReject={onTaskReject}
+              canApprove={canApprove}
               selectedTaskIds={selectedTaskIds}
               onTaskSelect={handleTaskSelect}
               onAddTask={onAddTask}
