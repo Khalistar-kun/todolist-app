@@ -471,7 +471,7 @@ export async function notifyTaskRejected(
       elements: [
         {
           type: 'mrkdwn',
-          text: `📋 _Task has been returned to ${returnStage?.replace('_', ' ') || 'Review'} for further work._`,
+          text: `📋 _Task has been returned to ${returnStage?.replace('_', ' ') || 'To Do'} for further work._`,
         },
       ],
     },

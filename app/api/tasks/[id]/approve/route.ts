@@ -146,7 +146,7 @@ export async function DELETE(
 
     const { id: taskId } = await params
     const body = await request.json().catch(() => ({}))
-    const { reason, returnStageId = 'review' } = body
+    const { reason, returnStageId = 'todo' } = body
 
     const supabaseAdmin = getSupabaseAdmin()
 

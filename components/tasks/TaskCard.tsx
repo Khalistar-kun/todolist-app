@@ -430,30 +430,72 @@ export function TaskCard({
         </div>
       )}
 
-      {/* Approval Actions - Show for tasks pending approval when user can approve */}
-      {canApprove && task.stage_id === doneStageId && task.approval_status === 'pending' && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <span className="text-xs text-yellow-700 dark:text-yellow-300 flex-1">Needs approval</span>
-          <button
-            onClick={handleApprove}
-            className="px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors flex items-center gap-1"
-            title="Approve task"
+      {/* Approval Checkbox - Show for tasks in Done stage when user can approve */}
+      {canApprove && task.stage_id === doneStageId && (task.approval_status === 'pending' || task.approval_status === 'approved') && (
+        <div className="flex items-center gap-3 mb-3">
+          {/* Approve Checkbox */}
+          <label
+            className="flex items-center gap-2 cursor-pointer group/approve"
+            onClick={(e) => e.stopPropagation()}
           >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-            Approve
-          </button>
-          <button
-            onClick={handleReject}
-            className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors flex items-center gap-1"
-            title="Reject task"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Reject
-          </button>
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={task.approval_status === 'approved'}
+                onChange={(e) => {
+                  e.stopPropagation()
+                  if (task.approval_status === 'approved') {
+                    // Already approved, do nothing
+                    return
+                  }
+                  // Confirm before approving
+                  if (window.confirm('Are you sure you want to approve this task?')) {
+                    onApprove?.(task)
+                  }
+                }}
+                disabled={task.approval_status === 'approved'}
+                className="sr-only peer"
+              />
+              <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${
+                task.approval_status === 'approved'
+                  ? 'bg-green-500 border-green-500'
+                  : 'border-gray-300 dark:border-gray-600 group-hover/approve:border-green-400 dark:group-hover/approve:border-green-500'
+              }`}>
+                {task.approval_status === 'approved' && (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className={`text-xs ${
+              task.approval_status === 'approved'
+                ? 'text-green-600 dark:text-green-400 font-medium'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}>
+              {task.approval_status === 'approved' ? 'Approved' : 'Approve'}
+            </span>
+          </label>
+
+          {/* Reject Button - Only show if not yet approved */}
+          {task.approval_status === 'pending' && (
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (window.confirm('Are you sure you want to reject this task? It will be moved back to To Do.')) {
+                  onReject?.(task)
+                }
+              }}
+              className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+              title="Reject and move to To Do"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Reject
+            </button>
+          )}
         </div>
       )}
 

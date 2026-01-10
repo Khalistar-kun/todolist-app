@@ -443,9 +443,7 @@ export default function ProjectPage() {
       return
     }
 
-    const reason = prompt('Reason for rejection (optional):')
-
-    // Optimistic update - move back to review
+    // Optimistic update - move back to To Do
     const previousTasks = { ...tasks }
     setTasks(prev => {
       const newTasks: Record<string, Task[]> = {}
@@ -456,7 +454,7 @@ export default function ProjectPage() {
         if (stageId === 'done') {
           newTasks[stageId] = prev[stageId].filter(t => {
             if (t.id === task.id) {
-              rejectedTask = { ...t, stage_id: 'review', approval_status: 'rejected' as const, rejection_reason: reason || null }
+              rejectedTask = { ...t, stage_id: 'todo', approval_status: 'rejected' as const, rejection_reason: null }
               return false
             }
             return true
@@ -466,10 +464,10 @@ export default function ProjectPage() {
         }
       }
 
-      // Add to review stage
+      // Add to To Do stage
       if (rejectedTask) {
-        if (!newTasks['review']) newTasks['review'] = []
-        newTasks['review'] = [...newTasks['review'], rejectedTask]
+        if (!newTasks['todo']) newTasks['todo'] = []
+        newTasks['todo'] = [...newTasks['todo'], rejectedTask]
       }
 
       return newTasks
@@ -479,13 +477,13 @@ export default function ProjectPage() {
       const response = await fetch(`/api/tasks/${task.id}/approve`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, returnStageId: 'review' }),
+        body: JSON.stringify({ returnStageId: 'todo' }),
       })
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to reject task')
       }
-      toast.success('Task rejected and returned to Review')
+      toast.success('Task rejected and moved to To Do')
     } catch (error: any) {
       // Rollback on error
       setTasks(previousTasks)
