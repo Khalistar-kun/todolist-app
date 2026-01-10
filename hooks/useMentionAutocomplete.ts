@@ -50,6 +50,24 @@ export function useMentionAutocomplete(
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Use refs to keep the latest values for click handlers (avoid stale closures)
+  const textRef = useRef(text)
+  const cursorPosRef = useRef(cursorPos)
+  const mentionStartIndexRef = useRef(mentionStartIndex)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    textRef.current = text
+  }, [text])
+
+  useEffect(() => {
+    cursorPosRef.current = cursorPos
+  }, [cursorPos])
+
+  useEffect(() => {
+    mentionStartIndexRef.current = mentionStartIndex
+  }, [mentionStartIndex])
+
   // Fetch users from API
   const fetchUsers = useCallback(
     async (searchQuery: string) => {
@@ -164,16 +182,23 @@ export function useMentionAutocomplete(
   )
 
   // Select a user (for click selection)
+  // Use refs to avoid stale closure issues when clicking on dropdown items
   const selectUser = useCallback(
     (user: MentionUser): { text: string; newCursorPosition: number } | null => {
-      if (mentionStartIndex === null) return null
+      const currentMentionStart = mentionStartIndexRef.current
+      if (currentMentionStart === null) return null
 
-      const result = replaceMention(text, mentionStartIndex, cursorPos, user.mention_handle)
+      const result = replaceMention(
+        textRef.current,
+        currentMentionStart,
+        cursorPosRef.current,
+        user.mention_handle
+      )
       onMentionSelect?.(user)
       setIsOpen(false)
       return result
     },
-    [text, mentionStartIndex, cursorPos, onMentionSelect]
+    [onMentionSelect]
   )
 
   // Close autocomplete
