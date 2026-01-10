@@ -307,6 +307,8 @@ export function QuickCommentPanel({
         {/* Input area */}
         <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 relative">
           <textarea
+            id="quick-comment-input"
+            name="comment"
             ref={inputRef}
             value={newComment}
             onChange={(e) => {

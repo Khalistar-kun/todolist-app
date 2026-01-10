@@ -365,6 +365,7 @@ export function TaskModal({
                   </label>
                   <textarea
                     id="description"
+                    name="description"
                     rows={3}
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -761,6 +762,8 @@ export function TaskModal({
                       {/* Add Comment */}
                       <div className="relative">
                         <textarea
+                          id="task-comment-input"
+                          name="comment"
                           ref={commentTextareaRef}
                           value={newComment}
                           onChange={(e) => {
