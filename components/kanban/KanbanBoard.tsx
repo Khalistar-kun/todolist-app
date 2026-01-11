@@ -252,12 +252,13 @@ export function KanbanBoard({
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // DND sensors - use longer delay/distance on touch to allow native scrolling
+  // DND sensors - balanced for both mobile scrolling and drag
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 250, // Long press to activate drag on mobile
-        tolerance: 5,
+        // Use distance instead of delay for better mobile UX
+        // Allows scrolling but activates drag with small movement
+        distance: 10, // 10px movement to activate drag
       },
     }),
     useSensor(KeyboardSensor, {
