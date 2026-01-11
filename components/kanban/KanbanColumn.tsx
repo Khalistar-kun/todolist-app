@@ -81,24 +81,25 @@ export function KanbanColumn({
   }, [menuOpen])
 
   return (
-    <div className="flex-shrink-0 w-[85vw] sm:w-80 snap-start sm:snap-align-none">
+    <div className="flex-shrink-0 w-[80vw] sm:w-80 snap-start sm:snap-align-none">
       <div className="card h-full flex flex-col">
         {/* Column Header */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-3 h-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: stage.color }}
               />
-              <h3 className="font-medium text-gray-900 dark:text-white">{stage.name}</h3>
-              <span className="text-sm text-gray-500 dark:text-gray-400">({tasks.length})</span>
+              <h3 className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">{stage.name}</h3>
+              <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">({tasks.length})</span>
             </div>
             <div className="relative">
               <button
                 ref={buttonRef}
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="touch-target p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors tap-highlight-none"
+                aria-label="Column menu"
               >
                 <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -109,14 +110,14 @@ export function KanbanColumn({
               {menuOpen && (
                 <div
                   ref={menuRef}
-                  className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+                  className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-scale-in"
                 >
                   <button
                     onClick={() => {
                       onAddTask?.(stage.id)
                       setMenuOpen(false)
                     }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 tap-highlight-none touch-target"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -129,7 +130,7 @@ export function KanbanColumn({
                       setMenuOpen(false)
                     }}
                     disabled={!onSortByPriority || tasks.length === 0}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent flex items-center gap-2"
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent flex items-center gap-2 tap-highlight-none touch-target"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
@@ -142,7 +143,7 @@ export function KanbanColumn({
                       setMenuOpen(false)
                     }}
                     disabled={!onSortByDueDate || tasks.length === 0}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent flex items-center gap-2"
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent flex items-center gap-2 tap-highlight-none touch-target"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
@@ -155,7 +156,7 @@ export function KanbanColumn({
                       onCollapse?.()
                       setMenuOpen(false)
                     }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 tap-highlight-none touch-target"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       {isCollapsed ? (
@@ -239,7 +240,8 @@ export function KanbanColumn({
           <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={() => onAddTask?.(stage.id)}
-              className="w-full flex items-center justify-center px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"
+              className="w-full touch-target flex items-center justify-center px-3 py-3 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors tap-highlight-none press-scale"
+              aria-label={`Add task to ${stage.name}`}
             >
               <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

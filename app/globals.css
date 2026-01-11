@@ -9,18 +9,32 @@
 @layer base {
   html {
     @apply antialiased scroll-smooth;
+    /* Prevent horizontal overflow on mobile */
+    overflow-x: hidden;
+    /* Prevent pull-to-refresh in horizontal direction */
+    overscroll-behavior-x: none;
   }
 
   body {
     @apply bg-gray-50 text-gray-900 font-sans;
     @apply dark:bg-gray-900 dark:text-gray-100;
     @apply transition-colors duration-200;
+    /* Prevent horizontal overflow on mobile */
+    overflow-x: hidden;
   }
 
-  /* Hide scrollbar but keep functionality */
+  /* Scrollbar visibility - show on mobile for feedback, hide on desktop until hover */
   * {
     scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+    /* Show scrollbar on mobile */
+    scrollbar-color: rgba(155, 155, 155, 0.3) transparent;
+  }
+
+  /* Desktop: hide scrollbar until hover */
+  @media (min-width: 768px) {
+    * {
+      scrollbar-color: transparent transparent;
+    }
   }
 
   *::-webkit-scrollbar {
@@ -33,12 +47,20 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: transparent;
+    /* Visible on mobile by default for feedback */
+    background: rgba(155, 155, 155, 0.3);
     border-radius: 3px;
   }
 
-  *:hover::-webkit-scrollbar-thumb {
-    background: rgba(155, 155, 155, 0.3);
+  /* Desktop: hide until hover */
+  @media (min-width: 768px) {
+    *::-webkit-scrollbar-thumb {
+      background: transparent;
+    }
+
+    *:hover::-webkit-scrollbar-thumb {
+      background: rgba(155, 155, 155, 0.3);
+    }
   }
 
   *::-webkit-scrollbar-thumb:hover {
@@ -99,9 +121,9 @@
     @apply hover:bg-red-700;
   }
 
-  /* Input */
+  /* Input - MOBILE FIX: 16px font prevents iOS zoom */
   .input {
-    @apply w-full px-3 py-2 text-sm bg-white rounded-lg;
+    @apply w-full px-3 py-2 text-base bg-white rounded-lg;
     @apply border border-gray-300;
     @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
     @apply dark:bg-gray-800 dark:border-gray-600 dark:text-white;
@@ -227,6 +249,30 @@
   .hover-lift {
     @apply hover:-translate-y-0.5 hover:shadow-md transition-all;
   }
+
+  /* MOBILE TOUCH UTILITIES */
+  /* Minimum 44x44px touch target for WCAG compliance */
+  .touch-target {
+    @apply min-w-[44px] min-h-[44px] flex items-center justify-center;
+  }
+
+  /* Prevent text selection on touch drag */
+  .touch-none {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Smooth momentum scrolling for mobile */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent tap highlight on mobile */
+  .tap-highlight-none {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* Animations */
@@ -282,11 +328,25 @@
   animation: slideDown 0.3s ease-in reverse forwards;
 }
 
+/* MOBILE: Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Date/time input styling - light mode by default */
 input[type="date"],
 input[type="datetime-local"],
 input[type="time"] {
   color-scheme: light;
+  /* MOBILE FIX: Prevent iOS zoom */
+  font-size: 16px;
 }
 
 /* Dark mode for date/time inputs - only when .dark class is present */
@@ -315,4 +375,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 .dark input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
+}
+
+/* MOBILE: Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
 }
