@@ -250,55 +250,14 @@ export function KanbanBoard({
     }
   }, [onBulkDelete, selectedTaskIds, clearSelection])
 
-  // Drag-to-scroll functionality for the kanban board
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [isDraggingScroll, setIsDraggingScroll] = useState(false)
-  const [scrollStartX, setScrollStartX] = useState(0)
-  const [scrollLeft, setScrollLeft] = useState(0)
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // Only initiate drag-to-scroll if clicking on the container itself (not on cards)
-    const target = e.target as HTMLElement
-    if (target.closest('.card') || target.closest('button') || target.closest('[data-draggable]')) {
-      return
-    }
-
-    if (scrollContainerRef.current) {
-      setIsDraggingScroll(true)
-      setScrollStartX(e.pageX - scrollContainerRef.current.offsetLeft)
-      setScrollLeft(scrollContainerRef.current.scrollLeft)
-      scrollContainerRef.current.style.cursor = 'grabbing'
-    }
-  }, [])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingScroll || !scrollContainerRef.current) return
-    e.preventDefault()
-    const x = e.pageX - scrollContainerRef.current.offsetLeft
-    const walk = (x - scrollStartX) * 1.5 // Multiply for faster scrolling
-    scrollContainerRef.current.scrollLeft = scrollLeft - walk
-  }, [isDraggingScroll, scrollStartX, scrollLeft])
-
-  const handleMouseUp = useCallback(() => {
-    setIsDraggingScroll(false)
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.style.cursor = 'grab'
-    }
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    if (isDraggingScroll) {
-      setIsDraggingScroll(false)
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.style.cursor = 'grab'
-      }
-    }
-  }, [isDraggingScroll])
-
+  // DND sensors - use longer delay/distance on touch to allow native scrolling
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        delay: 250, // Long press to activate drag on mobile
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -490,11 +449,7 @@ export function KanbanBoard({
       >
         <div
           ref={scrollContainerRef}
-          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-proximity sm:snap-none scroll-smooth touch-scroll tap-highlight-none md:cursor-grab select-none"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-proximity sm:snap-none scroll-smooth touch-scroll tap-highlight-none"
         >
           {workflowStages.map((stage) => (
             <KanbanColumn
