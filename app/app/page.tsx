@@ -245,41 +245,51 @@ export default function Dashboard() {
     }
   }, [user])
 
+  // Effect to fetch data when user authenticates
   useEffect(() => {
     // Clear any existing timeout
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current)
     }
 
-    if (user) {
-      // Set a timeout to prevent infinite loading
-      loadingTimeoutRef.current = setTimeout(() => {
-        if (dataLoading) {
-          console.warn('[Dashboard] Data loading timed out')
-          setLoadError('Loading is taking longer than expected. Please refresh the page.')
-          setDataLoading(false)
-        }
-      }, DATA_LOADING_TIMEOUT_MS)
-
-      fetchDashboardData().then(() => {
-        isInitialLoadRef.current = false
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current)
-        }
-      })
-    } else if (status === 'unauthenticated') {
-      // Confirmed not logged in - stop data loading
+    // Handle unauthenticated state
+    if (status === 'unauthenticated') {
       setDataLoading(false)
+      return
     }
-    // Note: Don't set dataLoading=false when status === 'loading'
-    // This prevents showing unauthenticated UI during auth hydration
+
+    // Only fetch when authenticated with a user
+    if (status !== 'authenticated' || !user) {
+      return
+    }
+
+    // Start fresh data load
+    setDataLoading(true)
+    console.log('[Dashboard] Initiating data fetch for user:', user.id)
+
+    // Set a timeout to prevent infinite loading
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.warn('[Dashboard] Data loading timed out')
+      setLoadError('Loading is taking longer than expected. Please refresh the page.')
+      setDataLoading(false)
+    }, DATA_LOADING_TIMEOUT_MS)
+
+    fetchDashboardData().then(() => {
+      isInitialLoadRef.current = false
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }).catch((error) => {
+      console.error('[Dashboard] Data fetch error:', error)
+      setDataLoading(false)
+    })
 
     return () => {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  }, [user, status, fetchDashboardData, dataLoading])
+  }, [user?.id, status, fetchDashboardData])
 
   // CRITICAL ORDER OF CHECKS:
   // 1. Auth not initialized → show skeleton (blocks ALL rendering until auth resolves)

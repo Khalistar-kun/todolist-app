@@ -87,8 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accessToken: null,
   })
 
-  // Refs to prevent race conditions
-  const initStartedRef = useRef(false)
+  // Ref to track if component is still mounted (for async operations)
   const isMountedRef = useRef(true)
 
   // -------------------------------------------------------------------------
@@ -135,15 +134,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // -------------------------------------------------------------------------
-  // INITIALIZATION (runs ONCE)
+  // INITIALIZATION (runs on every mount)
   // -------------------------------------------------------------------------
   useEffect(() => {
-    // Strict mode protection
-    if (initStartedRef.current) return
-    initStartedRef.current = true
+    // CRITICAL: Reset state to loading on mount
+    // On soft refresh, React may preserve state but we need fresh auth check
+    setState({ status: 'loading', user: null, accessToken: null })
     isMountedRef.current = true
 
+    // Local flag for double-call protection within this effect execution
+    let initStarted = false
+
     async function init() {
+      if (initStarted) return
+      initStarted = true
+
       console.log('[Auth] Initializing...')
 
       try {
