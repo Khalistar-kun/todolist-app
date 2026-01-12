@@ -1,11 +1,37 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { AITaskService, TaskSuggestion } from '@/lib/services/AITaskService'
 
 interface AISuggestionsProps {
   projectId: string
   onActionClick?: (action: TaskSuggestion['action']) => void
+}
+
+interface Position {
+  x: number
+  y: number
+}
+
+// Storage key for persisting position
+const POSITION_STORAGE_KEY = 'ai-insights-fab-position'
+
+// Get initial position from localStorage or default
+function getInitialPosition(): Position | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const stored = localStorage.getItem(POSITION_STORAGE_KEY)
+    if (stored) {
+      const pos = JSON.parse(stored)
+      // Validate position is within viewport
+      if (pos.x >= 0 && pos.y >= 0 && pos.x <= window.innerWidth - 56 && pos.y <= window.innerHeight - 56) {
+        return pos
+      }
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null
 }
 
 const SEVERITY_STYLES = {
@@ -69,6 +95,153 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
+  // Drag state
+  const [position, setPosition] = useState<Position | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [hasMoved, setHasMoved] = useState(false)
+  const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null)
+  const fabRef = useRef<HTMLButtonElement>(null)
+
+  // Initialize position from localStorage on mount
+  useEffect(() => {
+    const savedPos = getInitialPosition()
+    if (savedPos) {
+      setPosition(savedPos)
+    }
+  }, [])
+
+  // Save position to localStorage when it changes
+  useEffect(() => {
+    if (position) {
+      localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(position))
+    }
+  }, [position])
+
+  // Get current position or default bottom-right
+  const getCurrentPosition = useCallback(() => {
+    if (position) {
+      return { right: 'auto', bottom: 'auto', left: position.x, top: position.y }
+    }
+    // Default position
+    return { right: 16, bottom: 80, left: 'auto', top: 'auto' }
+  }, [position])
+
+  // Handle drag start (mouse)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isOpen) return // Don't drag when panel is open
+
+    const fabElement = fabRef.current
+    if (!fabElement) return
+
+    const rect = fabElement.getBoundingClientRect()
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      posX: rect.left,
+      posY: rect.top,
+    }
+    setHasMoved(false)
+
+    // Add listeners for drag
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [isOpen])
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragStartRef.current) return
+
+    const deltaX = e.clientX - dragStartRef.current.x
+    const deltaY = e.clientY - dragStartRef.current.y
+
+    // Only start dragging if moved more than 5px (to distinguish from click)
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      setIsDragging(true)
+      setHasMoved(true)
+
+      // Calculate new position
+      let newX = dragStartRef.current.posX + deltaX
+      let newY = dragStartRef.current.posY + deltaY
+
+      // Constrain to viewport
+      const fabSize = 56 // 14 * 4 = 56px on desktop
+      newX = Math.max(0, Math.min(window.innerWidth - fabSize, newX))
+      newY = Math.max(0, Math.min(window.innerHeight - fabSize, newY))
+
+      setPosition({ x: newX, y: newY })
+    }
+  }, [])
+
+  const handleMouseUp = useCallback(() => {
+    dragStartRef.current = null
+    setIsDragging(false)
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }, [handleMouseMove])
+
+  // Handle drag start (touch)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isOpen) return
+
+    const fabElement = fabRef.current
+    if (!fabElement) return
+
+    const touch = e.touches[0]
+    const rect = fabElement.getBoundingClientRect()
+
+    dragStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      posX: rect.left,
+      posY: rect.top,
+    }
+    setHasMoved(false)
+  }, [isOpen])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!dragStartRef.current) return
+
+    const touch = e.touches[0]
+    const deltaX = touch.clientX - dragStartRef.current.x
+    const deltaY = touch.clientY - dragStartRef.current.y
+
+    // Only start dragging if moved more than 10px
+    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+      setIsDragging(true)
+      setHasMoved(true)
+      e.preventDefault() // Prevent scroll while dragging
+
+      // Calculate new position
+      let newX = dragStartRef.current.posX + deltaX
+      let newY = dragStartRef.current.posY + deltaY
+
+      // Constrain to viewport
+      const fabSize = 48 // 12 * 4 = 48px on mobile
+      newX = Math.max(0, Math.min(window.innerWidth - fabSize, newX))
+      newY = Math.max(0, Math.min(window.innerHeight - fabSize, newY))
+
+      setPosition({ x: newX, y: newY })
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    dragStartRef.current = null
+    setIsDragging(false)
+  }, [])
+
+  // Handle click - only toggle if we haven't moved
+  const handleClick = useCallback(() => {
+    if (!hasMoved) {
+      setIsOpen(prev => !prev)
+    }
+    setHasMoved(false)
+  }, [hasMoved])
+
+  // Reset position to default
+  const handleResetPosition = useCallback(() => {
+    setPosition(null)
+    localStorage.removeItem(POSITION_STORAGE_KEY)
+  }, [])
+
   useEffect(() => {
     async function fetchSuggestions() {
       setLoading(true)
@@ -131,16 +304,71 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     return 'bg-purple-500'
   }
 
+  // Compute panel position based on FAB location
+  const getPanelPosition = useCallback(() => {
+    if (!position) {
+      // Default: panel opens above and to the left
+      return 'bottom-16 sm:bottom-18 right-0'
+    }
+
+    // Check if panel would go off-screen and adjust
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768
+    const panelWidth = 384 // sm:w-96 = 384px
+    const panelHeight = 400 // Approximate max height
+
+    // Determine horizontal position
+    const openLeft = position.x > viewportWidth / 2
+
+    // Determine vertical position
+    const openAbove = position.y > viewportHeight / 2
+
+    const classes = []
+    if (openAbove) {
+      classes.push('bottom-16 sm:bottom-18')
+    } else {
+      classes.push('top-16 sm:top-18')
+    }
+    if (openLeft) {
+      classes.push('right-0')
+    } else {
+      classes.push('left-0')
+    }
+
+    return classes.join(' ')
+  }, [position])
+
+  const positionStyle = getCurrentPosition()
+
   return (
-    <div ref={panelRef} className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
-      {/* Floating Action Button */}
+    <div
+      ref={panelRef}
+      className="fixed z-40"
+      style={{
+        left: positionStyle.left,
+        top: positionStyle.top,
+        right: positionStyle.right !== 'auto' ? positionStyle.right : undefined,
+        bottom: positionStyle.bottom !== 'auto' ? positionStyle.bottom : undefined,
+      }}
+    >
+      {/* Floating Action Button - Draggable */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 tap-highlight-none ${
-          isOpen
-            ? 'bg-purple-700 rotate-0'
-            : 'bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 hover:scale-105'
-        }`}
+        ref={fabRef}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg flex items-center justify-center tap-highlight-none select-none ${
+          isDragging
+            ? 'scale-110 shadow-2xl cursor-grabbing'
+            : isOpen
+              ? 'bg-purple-700 cursor-pointer'
+              : 'bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 hover:scale-105 cursor-grab'
+        } ${!isDragging ? 'transition-all duration-300' : ''}`}
+        style={{
+          background: isDragging ? 'linear-gradient(to bottom right, #7c3aed, #2563eb)' : undefined,
+        }}
         aria-label="AI Insights"
       >
         {/* Sparkle Icon */}
@@ -168,7 +396,7 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
 
       {/* Quest Panel */}
       {isOpen && (
-        <div className="absolute bottom-16 sm:bottom-18 right-0 w-80 sm:w-96 max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-scale-in origin-bottom-right">
+        <div className={`absolute ${getPanelPosition()} w-80 sm:w-96 max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-scale-in`}>
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -176,6 +404,18 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
               </svg>
               <span className="font-semibold text-white">AI Insights</span>
+              {/* Reset position button */}
+              {position && (
+                <button
+                  onClick={handleResetPosition}
+                  className="p-1 hover:bg-white/20 rounded transition-colors"
+                  title="Reset position"
+                >
+                  <svg className="w-4 h-4 text-white/70" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                  </svg>
+                </button>
+              )}
               <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full">
                 {visibleSuggestions.length} {visibleSuggestions.length === 1 ? 'quest' : 'quests'}
               </span>
