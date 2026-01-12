@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { AITaskService, TaskSuggestion } from '@/lib/services/AITaskService'
 
 interface AISuggestionsProps {
@@ -89,6 +89,10 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 }
 
 export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) {
+  // ============================================================================
+  // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
+  // ============================================================================
+
   const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([])
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
@@ -102,51 +106,93 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null)
   const fabRef = useRef<HTMLButtonElement>(null)
 
-  // Initialize position from localStorage on mount
-  useEffect(() => {
-    const savedPos = getInitialPosition()
-    if (savedPos) {
-      setPosition(savedPos)
-    }
-  }, [])
+  // ============================================================================
+  // MEMOIZED VALUES (also hooks, must be unconditional)
+  // ============================================================================
 
-  // Save position to localStorage when it changes
-  useEffect(() => {
-    if (position) {
-      localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(position))
-    }
-  }, [position])
+  const visibleSuggestions = useMemo(() => {
+    return suggestions.filter(s => !dismissed.has(s.id))
+  }, [suggestions, dismissed])
+
+  const criticalCount = useMemo(() => {
+    return visibleSuggestions.filter(s => s.severity === 'critical').length
+  }, [visibleSuggestions])
+
+  const warningCount = useMemo(() => {
+    return visibleSuggestions.filter(s => s.severity === 'warning').length
+  }, [visibleSuggestions])
+
+  // ============================================================================
+  // ALL CALLBACKS (hooks, must be unconditional)
+  // ============================================================================
 
   // Get current position or default bottom-right
   const getCurrentPosition = useCallback(() => {
     if (position) {
-      return { right: 'auto', bottom: 'auto', left: position.x, top: position.y }
+      return { right: 'auto' as const, bottom: 'auto' as const, left: position.x, top: position.y }
     }
     // Default position
-    return { right: 16, bottom: 80, left: 'auto', top: 'auto' }
+    return { right: 16, bottom: 80, left: 'auto' as const, top: 'auto' as const }
   }, [position])
 
-  // Handle drag start (mouse)
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isOpen) return // Don't drag when panel is open
+  // Compute panel position based on FAB location
+  const getPanelPosition = useCallback(() => {
+    if (!position) {
+      // Default: panel opens above and to the left
+      return 'bottom-16 sm:bottom-18 right-0'
+    }
 
-    const fabElement = fabRef.current
-    if (!fabElement) return
+    // Check if panel would go off-screen and adjust
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768
 
-    const rect = fabElement.getBoundingClientRect()
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      posX: rect.left,
-      posY: rect.top,
+    // Determine horizontal position
+    const openLeft = position.x > viewportWidth / 2
+
+    // Determine vertical position
+    const openAbove = position.y > viewportHeight / 2
+
+    const classes = []
+    if (openAbove) {
+      classes.push('bottom-16 sm:bottom-18')
+    } else {
+      classes.push('top-16 sm:top-18')
+    }
+    if (openLeft) {
+      classes.push('right-0')
+    } else {
+      classes.push('left-0')
+    }
+
+    return classes.join(' ')
+  }, [position])
+
+  const getBadgeColor = useCallback(() => {
+    if (criticalCount > 0) return 'bg-red-500'
+    if (warningCount > 0) return 'bg-amber-500'
+    return 'bg-purple-500'
+  }, [criticalCount, warningCount])
+
+  // Handle dismiss
+  const handleDismiss = useCallback((id: string) => {
+    setDismissed(prev => new Set([...prev, id]))
+  }, [])
+
+  // Reset position to default
+  const handleResetPosition = useCallback(() => {
+    setPosition(null)
+    localStorage.removeItem(POSITION_STORAGE_KEY)
+  }, [])
+
+  // Handle click - only toggle if we haven't moved
+  const handleClick = useCallback(() => {
+    if (!hasMoved) {
+      setIsOpen(prev => !prev)
     }
     setHasMoved(false)
+  }, [hasMoved])
 
-    // Add listeners for drag
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [isOpen])
-
+  // Mouse move handler (declared before mouseDown which references it)
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragStartRef.current) return
 
@@ -171,12 +217,34 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     }
   }, [])
 
+  // Mouse up handler
   const handleMouseUp = useCallback(() => {
     dragStartRef.current = null
     setIsDragging(false)
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }, [handleMouseMove])
+
+  // Handle drag start (mouse)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isOpen) return // Don't drag when panel is open
+
+    const fabElement = fabRef.current
+    if (!fabElement) return
+
+    const rect = fabElement.getBoundingClientRect()
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      posX: rect.left,
+      posY: rect.top,
+    }
+    setHasMoved(false)
+
+    // Add listeners for drag
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [isOpen, handleMouseMove, handleMouseUp])
 
   // Handle drag start (touch)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -228,34 +296,50 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     setIsDragging(false)
   }, [])
 
-  // Handle click - only toggle if we haven't moved
-  const handleClick = useCallback(() => {
-    if (!hasMoved) {
-      setIsOpen(prev => !prev)
-    }
-    setHasMoved(false)
-  }, [hasMoved])
+  // ============================================================================
+  // ALL EFFECTS (hooks, must be unconditional)
+  // ============================================================================
 
-  // Reset position to default
-  const handleResetPosition = useCallback(() => {
-    setPosition(null)
-    localStorage.removeItem(POSITION_STORAGE_KEY)
+  // Initialize position from localStorage on mount
+  useEffect(() => {
+    const savedPos = getInitialPosition()
+    if (savedPos) {
+      setPosition(savedPos)
+    }
   }, [])
 
+  // Save position to localStorage when it changes
   useEffect(() => {
+    if (position) {
+      localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(position))
+    }
+  }, [position])
+
+  // Fetch suggestions
+  useEffect(() => {
+    let cancelled = false
+
     async function fetchSuggestions() {
       setLoading(true)
       try {
         const data = await AITaskService.getProjectSuggestions(projectId)
-        setSuggestions(data)
+        if (!cancelled) {
+          setSuggestions(data)
+        }
       } catch (error) {
         console.error('Error fetching AI suggestions:', error)
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     fetchSuggestions()
+
+    return () => {
+      cancelled = true
+    }
   }, [projectId])
 
   // Close panel when clicking outside
@@ -283,60 +367,18 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     }
   }, [isOpen])
 
-  const handleDismiss = (id: string) => {
-    setDismissed(prev => new Set([...prev, id]))
-  }
+  // ============================================================================
+  // EARLY RETURNS - ONLY AFTER ALL HOOKS
+  // ============================================================================
 
-  const visibleSuggestions = suggestions.filter(s => !dismissed.has(s.id))
-
-  // Don't render if no suggestions
+  // Don't render if no suggestions and not loading
   if (!loading && visibleSuggestions.length === 0) {
     return null
   }
 
-  // Count critical/warning for badge color
-  const criticalCount = visibleSuggestions.filter(s => s.severity === 'critical').length
-  const warningCount = visibleSuggestions.filter(s => s.severity === 'warning').length
-
-  const getBadgeColor = () => {
-    if (criticalCount > 0) return 'bg-red-500'
-    if (warningCount > 0) return 'bg-amber-500'
-    return 'bg-purple-500'
-  }
-
-  // Compute panel position based on FAB location
-  const getPanelPosition = useCallback(() => {
-    if (!position) {
-      // Default: panel opens above and to the left
-      return 'bottom-16 sm:bottom-18 right-0'
-    }
-
-    // Check if panel would go off-screen and adjust
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 768
-    const panelWidth = 384 // sm:w-96 = 384px
-    const panelHeight = 400 // Approximate max height
-
-    // Determine horizontal position
-    const openLeft = position.x > viewportWidth / 2
-
-    // Determine vertical position
-    const openAbove = position.y > viewportHeight / 2
-
-    const classes = []
-    if (openAbove) {
-      classes.push('bottom-16 sm:bottom-18')
-    } else {
-      classes.push('top-16 sm:top-18')
-    }
-    if (openLeft) {
-      classes.push('right-0')
-    } else {
-      classes.push('left-0')
-    }
-
-    return classes.join(' ')
-  }, [position])
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   const positionStyle = getCurrentPosition()
 

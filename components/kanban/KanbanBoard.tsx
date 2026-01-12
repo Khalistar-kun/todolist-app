@@ -48,6 +48,15 @@ interface KanbanBoardProps {
   filterPendingApproval?: boolean
 }
 
+// Priority order for sorting (lower = higher priority) - defined outside component for stability
+const PRIORITY_ORDER: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  none: 4,
+}
+
 export function KanbanBoard({
   project,
   tasks,
@@ -96,15 +105,6 @@ export function KanbanBoard({
       return newSet
     })
   }, [])
-
-  // Priority order for sorting (lower = higher priority)
-  const PRIORITY_ORDER: Record<string, number> = {
-    urgent: 0,
-    high: 1,
-    medium: 2,
-    low: 3,
-    none: 4,
-  }
 
   // Local sorting handler (frontend-only, immediate feedback)
   const handleLocalSort = useCallback((stageId: string, sortBy: 'priority' | 'due_date') => {

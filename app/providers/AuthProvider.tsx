@@ -30,6 +30,13 @@ interface AuthContextType extends AuthState {
 }
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// Maximum time to wait for auth initialization before showing error
+const AUTH_TIMEOUT_MS = 10000 // 10 seconds
+
+// ============================================================================
 // SINGLETON AUTH STORE (survives React re-renders and soft refresh)
 // ============================================================================
 
@@ -44,6 +51,7 @@ class AuthStore {
   private listeners = new Set<Listener>()
   private initialized = false
   private initPromise: Promise<void> | null = null
+  private initStartTime: number = 0
 
   getState = (): AuthState => {
     return this.state
@@ -72,9 +80,14 @@ class AuthStore {
       return this.initPromise
     }
 
+    this.initStartTime = Date.now()
     this.initPromise = this.doInitialize()
-    await this.initPromise
-    this.initPromise = null
+
+    try {
+      await this.initPromise
+    } finally {
+      this.initPromise = null
+    }
   }
 
   private async doInitialize(): Promise<void> {
@@ -82,8 +95,22 @@ class AuthStore {
     this.setState({ status: 'loading', user: null, accessToken: null })
 
     try {
-      // STEP 1: Check for local session
-      const { data: sessionData } = await supabase.auth.getSession()
+      // STEP 1: Check for local session with timeout
+      const sessionPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Session fetch timeout')), AUTH_TIMEOUT_MS)
+      )
+
+      let sessionData: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']
+      try {
+        const result = await Promise.race([sessionPromise, timeoutPromise])
+        sessionData = result.data
+      } catch (timeoutError) {
+        console.error('[Auth] Session fetch timed out after', AUTH_TIMEOUT_MS, 'ms')
+        this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+        this.initialized = true
+        return
+      }
 
       if (!sessionData?.session) {
         console.log('[Auth] No session found')
@@ -92,9 +119,40 @@ class AuthStore {
         return
       }
 
-      // STEP 2: Validate session with server
+      // STEP 2: Validate session with server (with timeout)
       console.log('[Auth] Session found, validating...')
-      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const userPromise = supabase.auth.getUser()
+      const userTimeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('User validation timeout')), AUTH_TIMEOUT_MS)
+      )
+
+      let userData: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']
+      let userError: Awaited<ReturnType<typeof supabase.auth.getUser>>['error']
+
+      try {
+        const result = await Promise.race([userPromise, userTimeoutPromise])
+        userData = result.data
+        userError = result.error
+      } catch (timeoutError) {
+        console.error('[Auth] User validation timed out')
+        // If validation times out but we have a session, try to use cached session
+        // This prevents being locked out on slow connections
+        const authUser: AuthUser = {
+          id: sessionData.session.user.id,
+          email: sessionData.session.user.email || '',
+          full_name: sessionData.session.user.user_metadata?.full_name || null,
+          avatar_url: sessionData.session.user.user_metadata?.avatar_url || null,
+          username: null,
+        }
+        console.log('[Auth] Using cached session due to timeout')
+        this.setState({
+          status: 'authenticated',
+          user: authUser,
+          accessToken: sessionData.session.access_token,
+        })
+        this.initialized = true
+        return
+      }
 
       if (userError || !userData?.user) {
         console.warn('[Auth] Session invalid:', userError?.message)
@@ -112,7 +170,8 @@ class AuthStore {
         username: null,
       }
 
-      console.log('[Auth] Session validated - authenticated')
+      const initDuration = Date.now() - this.initStartTime
+      console.log('[Auth] Session validated - authenticated in', initDuration, 'ms')
       this.setState({
         status: 'authenticated',
         user: authUser,
@@ -120,23 +179,29 @@ class AuthStore {
       })
       this.initialized = true
 
-      // STEP 4: Load full profile in background
-      try {
-        const fullProfile = await getCurrentUser()
-        if (fullProfile && this.state.status === 'authenticated') {
-          this.setState({
-            ...this.state,
-            user: fullProfile,
-          })
-          console.log('[Auth] Full profile loaded')
-        }
-      } catch (profileError) {
-        console.error('[Auth] Profile fetch error:', profileError)
-      }
+      // STEP 4: Load full profile in background (non-blocking)
+      this.loadFullProfile()
     } catch (error) {
       console.error('[Auth] Critical init error:', error)
       this.setState({ status: 'unauthenticated', user: null, accessToken: null })
       this.initialized = true
+    }
+  }
+
+  // Load full profile in background - non-blocking
+  private async loadFullProfile(): Promise<void> {
+    try {
+      const fullProfile = await getCurrentUser()
+      if (fullProfile && this.state.status === 'authenticated') {
+        this.setState({
+          ...this.state,
+          user: fullProfile,
+        })
+        console.log('[Auth] Full profile loaded')
+      }
+    } catch (profileError) {
+      // Non-critical error - we already have basic user info
+      console.error('[Auth] Profile fetch error (non-critical):', profileError)
     }
   }
 
@@ -156,6 +221,7 @@ class AuthStore {
     }
 
     // Update state immediately
+    this.initialized = false
     this.setState({ status: 'unauthenticated', user: null, accessToken: null })
 
     try {
@@ -235,15 +301,39 @@ const authStore = new AuthStore()
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // ============================================================================
-// GLOBAL SKELETON
+// GLOBAL SKELETON WITH TIMEOUT
 // ============================================================================
 
 function GlobalSkeleton() {
+  const [showTimeout, setShowTimeout] = useState(false)
+
+  useEffect(() => {
+    // Show timeout message after AUTH_TIMEOUT_MS
+    const timer = setTimeout(() => {
+      setShowTimeout(true)
+    }, AUTH_TIMEOUT_MS)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
       <div className="flex flex-col items-center gap-4">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
         <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+        {showTimeout && (
+          <div className="text-center mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg max-w-sm">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              Taking longer than expected...
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-sm text-blue-600 dark:text-blue-400 underline hover:no-underline"
+            >
+              Refresh page
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
