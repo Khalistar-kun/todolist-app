@@ -194,15 +194,15 @@ export function TimelineView({
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Timeline</h2>
-          <div className="flex items-center gap-1 bg-white dark:bg-gray-700 rounded-lg p-1 border border-gray-200 dark:border-gray-600">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Timeline</h2>
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-white dark:bg-gray-700 rounded-lg p-0.5 sm:p-1 border border-gray-200 dark:border-gray-600">
             {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map(level => (
               <button
                 key={level}
                 onClick={() => setZoomLevel(level)}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md transition-colors touch-target tap-highlight-none ${
                   zoomLevel === level
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
@@ -214,10 +214,12 @@ export function TimelineView({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <label className="hidden sm:flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <input
               type="checkbox"
+              id="show_dependencies"
+              name="show_dependencies"
               checked={showDependencies}
               onChange={(e) => setShowDependencies(e.target.checked)}
               className="rounded border-gray-300 dark:border-gray-600"
@@ -232,7 +234,7 @@ export function TimelineView({
               const pixelsPerDay = columnWidth / (zoomLevel === 'day' ? 1 : zoomLevel === 'week' ? 7 : zoomLevel === 'month' ? 30 : 90)
               containerRef.current?.scrollTo({ left: daysSinceStart * pixelsPerDay - 200, behavior: 'smooth' })
             }}
-            className="px-3 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors touch-target tap-highlight-none"
           >
             Today
           </button>
@@ -241,8 +243,8 @@ export function TimelineView({
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Task list sidebar */}
-        <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
+        {/* Task list sidebar - narrower on mobile */}
+        <div className="w-40 sm:w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
           <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-600">
             Tasks ({tasksWithDates.length})
           </div>
