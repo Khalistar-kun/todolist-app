@@ -18,6 +18,15 @@ interface Member {
   }
 }
 
+interface PendingInvitation {
+  id: string
+  email: string
+  role: ProjectRole
+  status: string
+  created_at: string
+  expires_at: string
+}
+
 interface MemberManagementProps {
   projectId: string
   currentUserId: string
@@ -25,6 +34,7 @@ interface MemberManagementProps {
 
 export default function MemberManagement({ projectId, currentUserId }: MemberManagementProps) {
   const [members, setMembers] = useState<Member[]>([])
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([])
   const [loading, setLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<ProjectRole>('member')
@@ -38,6 +48,7 @@ export default function MemberManagement({ projectId, currentUserId }: MemberMan
       if (response.ok) {
         const data = await response.json()
         setMembers(data.members || [])
+        setPendingInvitations(data.pendingInvitations || [])
       }
     } catch (error) {
       console.error('Error fetching members:', error)
@@ -65,8 +76,15 @@ export default function MemberManagement({ projectId, currentUserId }: MemberMan
       const data = await response.json()
 
       if (response.ok) {
-        toast.success('Member added successfully')
-        setMembers([...members, data.member])
+        if (data.member) {
+          // User was added directly
+          toast.success('Member added successfully')
+          setMembers([...members, data.member])
+        } else if (data.invitation) {
+          // Invitation was created
+          toast.success(data.message || 'Invitation sent')
+          setPendingInvitations([...pendingInvitations, data.invitation])
+        }
         setInviteEmail('')
         setShowInviteForm(false)
       } else {
@@ -76,6 +94,26 @@ export default function MemberManagement({ projectId, currentUserId }: MemberMan
       toast.error('Failed to add member')
     } finally {
       setInviting(false)
+    }
+  }
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!confirm('Are you sure you want to cancel this invitation?')) return
+
+    try {
+      const response = await fetch(`/api/invitations?id=${invitationId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast.success('Invitation cancelled')
+        setPendingInvitations(pendingInvitations.filter(inv => inv.id !== invitationId))
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Failed to cancel invitation')
+      }
+    } catch (error) {
+      toast.error('Failed to cancel invitation')
     }
   }
 
@@ -306,6 +344,55 @@ export default function MemberManagement({ projectId, currentUserId }: MemberMan
           )
         })}
       </div>
+
+      {/* Pending Invitations */}
+      {pendingInvitations.length > 0 && permissions.canManageMembers && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Pending Invitations ({pendingInvitations.length})
+          </h4>
+          {pendingInvitations.map((invitation) => (
+            <div
+              key={invitation.id}
+              className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
+            >
+              <div className="flex items-center gap-3">
+                {/* Pending Icon */}
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+
+                {/* Info */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {invitation.email}
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Invitation pending - expires {new Date(invitation.expires_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${getRoleBadgeClasses(invitation.role)}`}>
+                  {roleConfig[invitation.role].label}
+                </span>
+                <button
+                  onClick={() => handleCancelInvitation(invitation.id)}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Cancel invitation"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Role Descriptions */}
       <div className="mt-6 p-4 rounded-lg bg-gray-100 dark:bg-gray-800">

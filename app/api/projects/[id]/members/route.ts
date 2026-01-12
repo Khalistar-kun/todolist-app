@@ -109,13 +109,94 @@ export async function GET(
       })
     )
 
+    // Get pending invitations (only for admins/owners)
+    let pendingInvitations: any[] = []
+    if (canManageMembers(membership.role)) {
+      const { data: invitations } = await supabaseAdmin
+        .from('project_invitations')
+        .select('id, email, role, status, created_at, expires_at')
+        .eq('project_id', projectId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      pendingInvitations = invitations || []
+    }
+
     return NextResponse.json({
       members: membersWithProfiles,
+      pendingInvitations,
       currentUserRole: membership.role
     })
   } catch (error) {
     console.error('[API] Error in GET /api/projects/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Helper function to send invitation email
+async function sendInvitationEmail(
+  to: string,
+  inviterName: string,
+  projectName: string,
+  role: string,
+  inviteToken: string
+) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://todolist-app-o9wc.vercel.app'
+  const inviteLink = `${baseUrl}/auth/signin?invite=${inviteToken}`
+
+  // Use Resend for email (if configured)
+  const resendApiKey = process.env.RESEND_API_KEY
+  if (!resendApiKey) {
+    console.log('[Email] No RESEND_API_KEY configured, skipping email')
+    return false
+  }
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'TodoList <noreply@resend.dev>',
+        to: [to],
+        subject: `You've been invited to join "${projectName}"`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1f2937; margin-bottom: 16px;">Project Invitation</h2>
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
+              <strong>${inviterName}</strong> has invited you to join the project <strong>"${projectName}"</strong> as a <strong>${role}</strong>.
+            </p>
+            <div style="margin: 32px 0;">
+              <a href="${inviteLink}"
+                 style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
+                Accept Invitation
+              </a>
+            </div>
+            <p style="color: #6b7280; font-size: 14px;">
+              This invitation will expire in 7 days.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="color: #9ca3af; font-size: 12px;">
+              If you didn't expect this invitation, you can safely ignore this email.
+            </p>
+          </div>
+        `,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      console.error('[Email] Failed to send invitation email:', error)
+      return false
+    }
+
+    console.log('[Email] Invitation email sent successfully to', to)
+    return true
+  } catch (error) {
+    console.error('[Email] Error sending invitation email:', error)
+    return false
   }
 }
 
@@ -167,52 +248,147 @@ export async function POST(
       return NextResponse.json({ error: 'You cannot assign a role equal to or higher than your own' }, { status: 403 })
     }
 
-    // Find the user by email
+    // Get project info for the invitation email
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('name')
+      .eq('id', projectId)
+      .single()
+
+    // Get inviter's profile
+    const { data: inviterProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', user.id)
+      .single()
+
+    const inviterName = inviterProfile?.full_name || inviterProfile?.email || 'Someone'
+    const projectName = project?.name || 'a project'
+
+    // Find the user by email in profiles
     const { data: targetProfile } = await supabaseAdmin
       .from('profiles')
       .select('id, email, full_name')
       .eq('email', email)
       .single()
 
-    if (!targetProfile) {
-      return NextResponse.json({ error: 'User not found with that email' }, { status: 404 })
+    if (targetProfile) {
+      // User exists with a profile - add them directly
+      // Check if user is already a member
+      const { data: existingMember } = await supabaseAdmin
+        .from('project_members')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', targetProfile.id)
+        .single()
+
+      if (existingMember) {
+        return NextResponse.json({ error: 'User is already a member of this project' }, { status: 400 })
+      }
+
+      // Add the member directly
+      const { data: newMember, error: insertError } = await supabaseAdmin
+        .from('project_members')
+        .insert({
+          project_id: projectId,
+          user_id: targetProfile.id,
+          role,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error('[API] Error adding member:', insertError)
+        return NextResponse.json({ error: insertError.message }, { status: 500 })
+      }
+
+      console.log(`[API] Added member ${targetProfile.email} to project ${projectId} as ${role}`)
+
+      // Create a notification for the added user
+      await supabaseAdmin.from('notifications').insert({
+        user_id: targetProfile.id,
+        type: 'project_invite',
+        title: 'Added to project',
+        message: `${inviterName} added you to "${projectName}" as ${role}`,
+        data: {
+          project_id: projectId,
+          project_name: projectName,
+          invited_by: user.id,
+          invited_by_name: inviterName,
+          role,
+        },
+      })
+
+      return NextResponse.json({
+        member: {
+          ...newMember,
+          user: targetProfile
+        }
+      }, { status: 201 })
     }
 
-    // Check if user is already a member
-    const { data: existingMember } = await supabaseAdmin
-      .from('project_members')
-      .select('id')
+    // User doesn't have a profile yet - create an invitation
+    console.log(`[API] User ${email} not found, creating invitation`)
+
+    // Check if there's already a pending invitation
+    const { data: existingInvite } = await supabaseAdmin
+      .from('project_invitations')
+      .select('id, status')
       .eq('project_id', projectId)
-      .eq('user_id', targetProfile.id)
+      .eq('email', email)
       .single()
 
-    if (existingMember) {
-      return NextResponse.json({ error: 'User is already a member of this project' }, { status: 400 })
+    if (existingInvite) {
+      if (existingInvite.status === 'pending') {
+        return NextResponse.json({ error: 'An invitation has already been sent to this email' }, { status: 400 })
+      }
+      // If previous invite was declined/expired, delete it so we can create a new one
+      await supabaseAdmin
+        .from('project_invitations')
+        .delete()
+        .eq('id', existingInvite.id)
     }
 
-    // Add the member
-    const { data: newMember, error: insertError } = await supabaseAdmin
-      .from('project_members')
+    // Create the invitation
+    const { data: invitation, error: inviteError } = await supabaseAdmin
+      .from('project_invitations')
       .insert({
         project_id: projectId,
-        user_id: targetProfile.id,
+        email: email.toLowerCase(),
         role,
+        invited_by: user.id,
       })
       .select()
       .single()
 
-    if (insertError) {
-      console.error('[API] Error adding member:', insertError)
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    if (inviteError) {
+      console.error('[API] Error creating invitation:', inviteError)
+      return NextResponse.json({ error: inviteError.message }, { status: 500 })
     }
 
-    console.log(`[API] Added member ${targetProfile.email} to project ${projectId} as ${role}`)
+    console.log(`[API] Created invitation for ${email} to project ${projectId}`)
+
+    // Send invitation email
+    const emailSent = await sendInvitationEmail(
+      email,
+      inviterName,
+      projectName,
+      role,
+      invitation.token
+    )
 
     return NextResponse.json({
-      member: {
-        ...newMember,
-        user: targetProfile
-      }
+      invitation: {
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role,
+        status: invitation.status,
+        expires_at: invitation.expires_at,
+        email_sent: emailSent,
+      },
+      message: emailSent
+        ? `Invitation sent to ${email}. They will be added when they sign up or log in.`
+        : `Invitation created for ${email}. They will be added when they sign up or log in.`
     }, { status: 201 })
   } catch (error) {
     console.error('[API] Error in POST /api/projects/[id]/members:', error)

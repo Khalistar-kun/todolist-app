@@ -8,6 +8,7 @@ import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { useSound } from '@/hooks/useSound'
+import { PendingInvitationsBanner } from '@/components/invitations/PendingInvitationsBanner'
 
 interface DashboardStats {
   totalProjects: number
@@ -329,6 +330,9 @@ export default function Dashboard() {
   return (
     <div className="px-4 py-6 sm:px-0 animate-fade-in">
       <div className="max-w-7xl mx-auto">
+        {/* Pending Invitations Banner */}
+        <PendingInvitationsBanner />
+
         {/* Header */}
         <div className="page-header animate-slide-up">
           <h1 className="page-title text-3xl">
