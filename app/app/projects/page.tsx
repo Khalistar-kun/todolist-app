@@ -53,8 +53,8 @@ function ProjectsSkeleton() {
 }
 
 export default function ProjectsPage() {
-  // CRITICAL: Use status as primary auth indicator
-  const { user, status } = useAuth()
+  // CRITICAL: Use isInitialized to block render until auth resolves
+  const { user, status, isInitialized } = useAuth()
   const [projects, setProjects] = useState<ProjectWithMembers[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
@@ -104,12 +104,12 @@ export default function ProjectsPage() {
   }, [user, fetchProjects])
 
   // CRITICAL ORDER OF CHECKS:
-  // 1. Auth loading → show skeleton (neutral UI)
+  // 1. Auth not initialized → show skeleton (blocks ALL rendering)
   // 2. Data loading (when authenticated) → show skeleton
   // 3. Unauthenticated → show login prompt
   // 4. Authenticated with data → show content
 
-  if (status === 'loading') {
+  if (!isInitialized || status === 'loading') {
     return <ProjectsSkeleton />
   }
 

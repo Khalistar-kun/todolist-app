@@ -1,7 +1,6 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
-import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/auth-client'
 
@@ -14,43 +13,34 @@ interface AuthUser {
 }
 
 // Auth status represents the three possible states
+// CRITICAL: 'loading' means auth has NOT been resolved yet
+// Components MUST NOT render auth-dependent content until status !== 'loading'
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
 interface AuthContextType {
   user: AuthUser | null
   loading: boolean
-  // New: explicit auth status to prevent false logout states
+  // Explicit auth status - primary source of truth for auth state
   status: AuthStatus
+  // True when initial auth check is complete - use this to gate rendering
+  isInitialized: boolean
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
-  // Force refresh for bfcache recovery
-  forceRefresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Auth loading timeout - reduced to 5 seconds, but we handle timeout differently now
-const AUTH_TIMEOUT_MS = 5000
-
-// Visibility refresh debounce (prevent rapid refreshes)
-const VISIBILITY_DEBOUNCE_MS = 2000
-
-// Fast initial check timeout - give local storage check 500ms max
-const FAST_CHECK_TIMEOUT_MS = 500
-
-// Clear all user-related data from localStorage
-function clearUserStorage(userId?: string) {
+// Clear user-related data from localStorage (NOT Supabase keys - those are managed by Supabase)
+function clearUserStorage() {
   try {
     const keysToRemove: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key) {
-        // Clear profile, notifications, and any user-specific data
         if (
           key.startsWith('profile-') ||
           key.startsWith('notifications-') ||
-          key.startsWith('welcome-seen-') ||
-          key.startsWith('sb-') // Supabase keys
+          key.startsWith('welcome-seen-')
         ) {
           keysToRemove.push(key)
         }
@@ -64,39 +54,40 @@ function clearUserStorage(userId?: string) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<AuthStatus>('loading')
-  const initializedRef = useRef(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const lastVisibilityRefreshRef = useRef<number>(0)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Refs to prevent race conditions and double-init
+  const initStartedRef = useRef(false)
   const isMountedRef = useRef(true)
+  const lastUserIdRef = useRef<string | null>(null)
 
-  // Helper to update auth state atomically
-  const setAuthState = useCallback((newUser: AuthUser | null, isLoading: boolean) => {
-    setUser(newUser)
-    setLoading(isLoading)
-    setStatus(isLoading ? 'loading' : newUser ? 'authenticated' : 'unauthenticated')
-  }, [])
+  // Stable atomic state update
+  const setAuthState = useCallback((newUser: AuthUser | null, newStatus: AuthStatus) => {
+    if (!isMountedRef.current) return
 
-  // Clear timeout on cleanup
-  const clearAuthTimeout = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
+    // Prevent unnecessary updates that could cause re-renders
+    const newUserId = newUser?.id || null
+    if (lastUserIdRef.current === newUserId && status === newStatus) {
+      return
     }
-  }, [])
+    lastUserIdRef.current = newUserId
+
+    setUser(newUser)
+    setStatus(newStatus)
+  }, [status])
 
   const signOut = useCallback(async () => {
-    const currentUserId = user?.id
+    // Clear localStorage data BEFORE changing state
+    clearUserStorage()
 
-    // Immediately clear user state for responsive UI
-    setAuthState(null, false)
-
-    // Clear localStorage data
-    clearUserStorage(currentUserId)
+    // Update state immediately
+    lastUserIdRef.current = null
+    setUser(null)
+    setStatus('unauthenticated')
 
     try {
-      // Remove all realtime channels to prevent stale connections
+      // Remove all realtime channels
       const channels = supabase.getChannels()
       await Promise.all(channels.map(channel => supabase.removeChannel(channel)))
 
@@ -108,101 +99,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('[Auth] Error during signOut:', err)
     }
-  }, [user?.id, setAuthState])
+  }, [])
 
   const refreshUser = useCallback(async () => {
+    if (!isMountedRef.current) return
+
     try {
       const currentUser = await getCurrentUser()
-      if (isMountedRef.current) {
+      if (isMountedRef.current && currentUser) {
         setUser(currentUser)
+        lastUserIdRef.current = currentUser.id
       }
     } catch (error) {
       console.error('[Auth] Error refreshing user:', error)
-      if (isMountedRef.current) {
-        setUser(null)
-      }
     }
   }, [])
 
-  // Force refresh - validates session with server and refreshes all state
-  // Used for bfcache recovery and visibility changes
-  const forceRefresh = useCallback(async () => {
-    const now = Date.now()
-    // Debounce rapid refreshes
-    if (now - lastVisibilityRefreshRef.current < VISIBILITY_DEBOUNCE_MS) {
-      console.log('[Auth] Skipping force refresh - too soon since last refresh')
-      return
-    }
-    lastVisibilityRefreshRef.current = now
-
-    console.log('[Auth] Force refresh triggered - validating session')
-    try {
-      // CRITICAL: Use getUser() to validate with server, not getSession() which may be stale
-      const { data: { user: authUser }, error } = await supabase.auth.getUser()
-
-      if (!isMountedRef.current) return
-
-      if (error) {
-        console.warn('[Auth] Force refresh - session invalid:', error.message)
-        setAuthState(null, false)
-        return
-      }
-
-      if (authUser) {
-        // Session is valid - refresh profile
-        const profile = await getCurrentUser()
-        if (isMountedRef.current) {
-          setAuthState(profile, false)
-          console.log('[Auth] Force refresh complete - user authenticated')
-        }
-      } else {
-        // No user
-        if (isMountedRef.current) {
-          setAuthState(null, false)
-          console.log('[Auth] Force refresh complete - no user')
-        }
-      }
-    } catch (error) {
-      console.error('[Auth] Force refresh error:', error)
-      // Don't change state on error - keep existing state
-    }
-  }, [setAuthState])
-
+  // CRITICAL: Single initialization effect - runs ONCE on mount
+  // No timeouts, no arbitrary fallbacks - auth resolves naturally
   useEffect(() => {
     // Prevent double initialization in React StrictMode
-    if (initializedRef.current) return
-    initializedRef.current = true
+    if (initStartedRef.current) return
+    initStartedRef.current = true
+    isMountedRef.current = true
 
-    // Set a timeout to prevent infinite loading
-    // IMPORTANT: On timeout, we DON'T set user to null - we just stop loading
-    // This prevents showing logged-out UI when we're just slow
-    timeoutRef.current = setTimeout(() => {
-      if (status === 'loading') {
-        console.warn('[Auth] Auth loading timed out after', AUTH_TIMEOUT_MS, 'ms - keeping current state')
-        // CRITICAL FIX: Only stop loading, don't change user state
-        // If we have a user from preliminary check, keep them
-        // This prevents the flash to logout on slow connections
-        setLoading(false)
-        setStatus(user ? 'authenticated' : 'unauthenticated')
-      }
-    }, AUTH_TIMEOUT_MS)
+    const initializeAuth = async () => {
+      console.log('[Auth] Initializing...')
 
-    // Get initial session - use getSession first for instant check, then validate
-    const getInitialSession = async () => {
       try {
-        // STEP 1: Quick local session check (instant, from cookies)
+        // STEP 1: Check for existing session (instant, from cookies)
         const { data: { session: localSession } } = await supabase.auth.getSession()
 
-        // If no local session at all, user is definitely not logged in
         if (!localSession) {
-          setAuthState(null, false)
-          clearAuthTimeout()
+          // No session found - user is definitively unauthenticated
+          console.log('[Auth] No session - unauthenticated')
+          setUser(null)
+          setStatus('unauthenticated')
+          setIsInitialized(true)
           return
         }
 
-        // STEP 2: We have a local session - show user as authenticated immediately
-        // This prevents the "flash to login" issue
-        // Set a preliminary user state with basic info from session
+        // STEP 2: Session exists - set authenticated state immediately
+        // This prevents "flash to login" during slow network
         const preliminaryUser: AuthUser = {
           id: localSession.user.id,
           email: localSession.user.email || '',
@@ -210,129 +148,133 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           avatar_url: localSession.user.user_metadata?.avatar_url || null,
           username: null,
         }
-        setAuthState(preliminaryUser, false)
 
-        // STEP 3: Now validate with server and get full profile (background)
-        const { data: { user: authUser }, error } = await supabase.auth.getUser()
+        lastUserIdRef.current = preliminaryUser.id
+        setUser(preliminaryUser)
+        setStatus('authenticated')
+        setIsInitialized(true) // UI can now render
+        console.log('[Auth] Session found - authenticated (preliminary)')
 
-        if (error) {
-          // Session was invalid on server - NOW we know user is logged out
-          console.warn('[Auth] Session validation error:', error.message)
-          setAuthState(null, false)
-          clearAuthTimeout()
-          return
-        }
+        // STEP 3: Validate with server and get full profile (background, non-blocking)
+        try {
+          const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
-        if (authUser) {
-          // Get full profile data
-          const profile = await getCurrentUser()
-          if (profile) {
-            setAuthState(profile, false)
+          if (!isMountedRef.current) return
+
+          if (error || !authUser) {
+            // Session invalid on server - clear state
+            console.warn('[Auth] Session invalid:', error?.message)
+            lastUserIdRef.current = null
+            setUser(null)
+            setStatus('unauthenticated')
+            return
           }
-          // If profile fetch fails, keep preliminary user data
-        } else {
-          // Server says no user - clear state
-          setAuthState(null, false)
+
+          // Get full profile
+          const profile = await getCurrentUser()
+          if (profile && isMountedRef.current) {
+            setUser(profile)
+            console.log('[Auth] Full profile loaded')
+          }
+        } catch (error) {
+          console.error('[Auth] Background validation error:', error)
+          // Keep preliminary state on background errors
         }
       } catch (error) {
-        console.error('[Auth] Error getting initial session:', error)
-        // On error, don't flash logout - maintain current state
-        setAuthState(null, false)
-      } finally {
-        clearAuthTimeout()
+        console.error('[Auth] Critical init error:', error)
+        setUser(null)
+        setStatus('unauthenticated')
+        setIsInitialized(true)
       }
     }
 
-    getInitialSession()
+    initializeAuth()
 
-    // Listen for auth changes
+    // Listen for auth changes from other tabs or token refresh
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Handle sign out event immediately
+        console.log('[Auth] State change:', event)
+
         if (event === 'SIGNED_OUT') {
-          setAuthState(null, false)
+          lastUserIdRef.current = null
+          setUser(null)
+          setStatus('unauthenticated')
           clearUserStorage()
           return
         }
 
-        // Handle token refresh errors
         if (event === 'TOKEN_REFRESHED' && !session) {
           console.warn('[Auth] Token refresh failed')
-          setAuthState(null, false)
+          lastUserIdRef.current = null
+          setUser(null)
+          setStatus('unauthenticated')
           return
         }
 
-        if (session?.user) {
+        if (session?.user && isMountedRef.current) {
           try {
             const profile = await getCurrentUser()
-            setAuthState(profile, false)
+            if (profile && isMountedRef.current) {
+              lastUserIdRef.current = profile.id
+              setUser(profile)
+              setStatus('authenticated')
+            }
           } catch (error) {
-            console.error('[Auth] Error fetching profile on auth change:', error)
-            // Don't clear user on profile fetch error - session is still valid
-            // Keep existing user state
+            console.error('[Auth] Profile fetch error:', error)
+            // Session valid but profile fetch failed - use basic info
+            const basicUser: AuthUser = {
+              id: session.user.id,
+              email: session.user.email || '',
+              full_name: session.user.user_metadata?.full_name || null,
+              avatar_url: session.user.user_metadata?.avatar_url || null,
+              username: null,
+            }
+            lastUserIdRef.current = basicUser.id
+            setUser(basicUser)
+            setStatus('authenticated')
           }
-        } else {
-          setAuthState(null, false)
         }
-        clearAuthTimeout()
       }
     )
 
     return () => {
-      subscription.unsubscribe()
-      clearAuthTimeout()
-    }
-  }, [clearAuthTimeout, setAuthState, status])
-
-  // Handle page visibility changes and bfcache recovery
-  // CRITICAL for macOS/iOS Safari where bfcache causes stale state
-  useEffect(() => {
-    isMountedRef.current = true
-
-    // Handle visibility change (tab switching)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && status === 'authenticated') {
-        console.log('[Auth] Tab became visible - refreshing session')
-        forceRefresh()
-      }
-    }
-
-    // Handle pageshow (bfcache restoration) - CRITICAL for macOS Safari
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        console.log('[Auth] Page restored from bfcache - force refreshing')
-        // Always refresh on bfcache restoration regardless of current status
-        forceRefresh()
-      }
-    }
-
-    // Handle window focus (user clicks on window)
-    const handleFocus = () => {
-      if (status === 'authenticated') {
-        console.log('[Auth] Window focused - validating session')
-        forceRefresh()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('pageshow', handlePageShow)
-    window.addEventListener('focus', handleFocus)
-
-    return () => {
       isMountedRef.current = false
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('pageshow', handlePageShow)
-      window.removeEventListener('focus', handleFocus)
+      subscription.unsubscribe()
     }
-  }, [status, forceRefresh])
+  }, [])
+
+  // Handle bfcache restoration ONLY - not visibility changes
+  // Visibility-based refresh causes the subscription loops
+  useEffect(() => {
+    const handlePageShow = async (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+
+      console.log('[Auth] bfcache restore - validating session')
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session && status === 'authenticated') {
+          console.log('[Auth] Session expired during bfcache')
+          lastUserIdRef.current = null
+          setUser(null)
+          setStatus('unauthenticated')
+        }
+      } catch (error) {
+        console.error('[Auth] bfcache session check error:', error)
+      }
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [status])
 
   const value = {
     user,
-    loading,
+    loading: status === 'loading',
     status,
+    isInitialized,
     signOut,
     refreshUser,
-    forceRefresh,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

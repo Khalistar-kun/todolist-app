@@ -2,6 +2,7 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { RealtimeProvider } from '@/contexts/RealtimeContext'
 
 export const metadata = {
   title: 'TodoApp - Organize your work and life',
@@ -37,8 +38,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
         <ThemeProvider>
           <AuthProvider>
-            {children}
-            <Toaster
+            <RealtimeProvider>
+              {children}
+              <Toaster
               position="top-right"
               toastOptions={{
                 duration: 4000,
@@ -64,7 +66,8 @@ export default function RootLayout({
                   },
                 },
               }}
-            />
+              />
+            </RealtimeProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

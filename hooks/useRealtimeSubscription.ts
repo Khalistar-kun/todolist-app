@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { useRealtime } from '@/contexts/RealtimeContext'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 type PostgresChangeEvent = 'INSERT' | 'UPDATE' | 'DELETE' | '*'
 
@@ -23,10 +23,15 @@ interface UseRealtimeSubscriptionOptions {
 /**
  * Hook for subscribing to Supabase real-time changes on database tables
  *
- * IMPORTANT: This hook properly cleans up subscriptions when:
- * - Component unmounts
- * - enabled becomes false (e.g., user logs out)
- * - subscriptions change
+ * ARCHITECTURE: This hook uses the centralized RealtimeContext instead of
+ * creating per-component channels. This prevents the "unsubscribe spam"
+ * that occurred when components re-rendered or auth state changed.
+ *
+ * The centralized channel:
+ * - Lives at app root (RealtimeProvider)
+ * - Survives page navigation
+ * - Only destroyed on logout
+ * - Handlers are registered/unregistered without recreating the channel
  *
  * @example
  * useRealtimeSubscription({
@@ -46,104 +51,67 @@ export function useRealtimeSubscription({
   onChange,
   enabled = true,
 }: UseRealtimeSubscriptionOptions) {
-  const channelRef = useRef<RealtimeChannel | null>(null)
-  const isCleaningUpRef = useRef(false)
-  const subscriptionsKey = JSON.stringify(subscriptions)
+  const { subscribe } = useRealtime()
 
+  // Stable refs to prevent re-subscriptions on callback changes
+  const onInsertRef = useRef(onInsert)
+  const onUpdateRef = useRef(onUpdate)
+  const onDeleteRef = useRef(onDelete)
+  const onChangeRef = useRef(onChange)
+
+  // Update refs on each render
+  onInsertRef.current = onInsert
+  onUpdateRef.current = onUpdate
+  onDeleteRef.current = onDelete
+  onChangeRef.current = onChange
+
+  // Stable handler that routes to appropriate callbacks
   const handleChange = useCallback(
     (payload: RealtimePostgresChangesPayload<any>) => {
-      // Call specific event handlers
       switch (payload.eventType) {
         case 'INSERT':
-          onInsert?.(payload)
+          onInsertRef.current?.(payload)
           break
         case 'UPDATE':
-          onUpdate?.(payload)
+          onUpdateRef.current?.(payload)
           break
         case 'DELETE':
-          onDelete?.(payload)
+          onDeleteRef.current?.(payload)
           break
       }
-      // Always call the general onChange handler
-      onChange?.(payload)
+      onChangeRef.current?.(payload)
     },
-    [onInsert, onUpdate, onDelete, onChange]
+    []
   )
 
-  // Cleanup function that can be called from multiple places
-  const cleanup = useCallback(() => {
-    if (isCleaningUpRef.current) return
-    isCleaningUpRef.current = true
-
-    if (channelRef.current) {
-      const tables = subscriptions.map(s => s.table).join(', ')
-      console.log(`[Realtime] Unsubscribing from ${tables}`)
-      supabase.removeChannel(channelRef.current)
-      channelRef.current = null
-    }
-
-    isCleaningUpRef.current = false
-  }, [subscriptions])
+  // Create stable subscription key - only table and filter matter
+  const subscriptionsKey = JSON.stringify(
+    subscriptions.map(s => ({ table: s.table, filter: s.filter }))
+  )
 
   useEffect(() => {
-    // Clean up existing channel before creating new one or when disabled
-    cleanup()
-
     if (!enabled || subscriptions.length === 0) {
       return
     }
 
-    // Create a unique channel name based on subscriptions
-    const channelName = `realtime-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // Register handlers for each subscription with the central manager
+    const unsubscribers: (() => void)[] = []
 
-    // Create the channel
-    let channel = supabase.channel(channelName)
-
-    // Add subscriptions for each table
-    subscriptions.forEach((config) => {
-      const { table, schema = 'public', event = '*', filter } = config
-
-      const subscriptionConfig: any = {
-        event,
-        schema,
-        table,
-      }
-
-      if (filter) {
-        subscriptionConfig.filter = filter
-      }
-
-      channel = channel.on(
-        'postgres_changes',
-        subscriptionConfig,
-        handleChange
-      )
+    subscriptions.forEach(config => {
+      const unsubscribe = subscribe(config.table, handleChange, config.filter)
+      unsubscribers.push(unsubscribe)
     })
 
-    // Subscribe to the channel
-    channel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
-        // Reduce logging noise
-      } else if (status === 'CHANNEL_ERROR') {
-        console.error('[Realtime] Channel error:', err)
-      } else if (status === 'TIMED_OUT') {
-        console.error('[Realtime] Subscription timed out')
-      }
-    })
+    // Cleanup: unregister handlers (does NOT destroy the channel)
+    return () => {
+      unsubscribers.forEach(unsub => unsub())
+    }
+  }, [subscriptionsKey, enabled, handleChange, subscribe])
 
-    channelRef.current = channel
-
-    // Cleanup on unmount or when subscriptions change
-    return cleanup
-  }, [subscriptionsKey, enabled, handleChange, cleanup])
-
-  // Return function to manually unsubscribe
+  // Return object for API compatibility
   return {
     unsubscribe: () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
+      // No-op - cleanup is handled automatically by effect
     },
   }
 }

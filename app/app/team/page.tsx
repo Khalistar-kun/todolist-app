@@ -59,8 +59,8 @@ function TeamSkeleton() {
 
 export default function TeamPage() {
   const router = useRouter()
-  // CRITICAL: Use status as primary auth indicator, not loading boolean
-  const { user, status } = useAuth()
+  // CRITICAL: Use isInitialized to block render until auth resolves
+  const { user, status, isInitialized } = useAuth()
   const { playClick, playSuccess } = useSound()
   const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -232,12 +232,12 @@ export default function TeamPage() {
   }
 
   // CRITICAL ORDER OF CHECKS:
-  // 1. Auth loading → show skeleton (neutral UI)
+  // 1. Auth not initialized → show skeleton (blocks ALL rendering)
   // 2. Data loading (when authenticated) → show skeleton
   // 3. Unauthenticated → show login prompt (only after auth is resolved)
   // 4. Authenticated with data → show content
 
-  if (status === 'loading') {
+  if (!isInitialized || status === 'loading') {
     return <TeamSkeleton />
   }
 

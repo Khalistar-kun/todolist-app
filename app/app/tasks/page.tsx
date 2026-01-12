@@ -53,7 +53,7 @@ function TasksSkeleton() {
 const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 }
 
 export default function MyTasksPage() {
-  const { user, status } = useAuth()
+  const { user, status, isInitialized } = useAuth()
   const { playClick, playToggle } = useSound()
   const [tasks, setTasks] = useState<TaskWithProject[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -348,7 +348,7 @@ export default function MyTasksPage() {
     }).length,
   }
 
-  if (status === 'loading') {
+  if (!isInitialized || status === 'loading') {
     return <TasksSkeleton />
   }
 

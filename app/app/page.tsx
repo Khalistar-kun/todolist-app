@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Project, Task } from '@/lib/supabase'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
-import { usePageVisibility } from '@/hooks/usePageVisibility'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { useSound } from '@/hooks/useSound'
@@ -81,8 +80,8 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
-  // CRITICAL: Use status as primary auth indicator, not loading boolean
-  const { user, status, forceRefresh } = useAuth()
+  // CRITICAL: Use status and isInitialized as primary auth indicators
+  const { user, status, isInitialized } = useAuth()
   const { playClick } = useSound()
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -159,26 +158,20 @@ export default function Dashboard() {
     enabled: !!user,
   })
 
-  // Handle page visibility - refresh data when tab becomes visible or page restored from bfcache
-  // This is CRITICAL for macOS/iOS where bfcache causes stale data
-  usePageVisibility({
-    onVisible: () => {
-      const now = Date.now()
-      // Debounce - only refresh if more than 5 seconds since last refresh
-      if (user && now - lastDataRefreshRef.current > 5000) {
-        console.log('[Dashboard] Page visible - refreshing data')
-        lastDataRefreshRef.current = now
-        refetchDataSilently()
-      }
-    },
-    onPageShow: (persisted) => {
-      if (persisted && user) {
+  // Handle bfcache restoration - only refresh data on bfcache restore
+  // Visibility-based refresh is removed as it causes loops
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && user) {
         console.log('[Dashboard] Page restored from bfcache - refreshing data')
         lastDataRefreshRef.current = Date.now()
         refetchDataSilently()
       }
-    },
-  })
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [user, refetchDataSilently])
 
   const fetchDashboardData = useCallback(async () => {
     if (!user) return
@@ -289,13 +282,13 @@ export default function Dashboard() {
   }, [user, status, fetchDashboardData, dataLoading])
 
   // CRITICAL ORDER OF CHECKS:
-  // 1. Auth loading → show skeleton (neutral UI)
+  // 1. Auth not initialized → show skeleton (blocks ALL rendering until auth resolves)
   // 2. Data loading (when authenticated) → show skeleton
   // 3. Unauthenticated → show login prompt (only after auth is resolved)
   // 4. Authenticated with data → show dashboard
 
-  // Check 1: Auth is still loading - show skeleton, never login UI
-  if (status === 'loading') {
+  // Check 1: Auth is not yet initialized - show skeleton, never any auth-dependent UI
+  if (!isInitialized || status === 'loading') {
     return <DashboardSkeleton />
   }
 
