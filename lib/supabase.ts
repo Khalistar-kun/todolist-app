@@ -407,6 +407,7 @@ export type Database = {
           title: string
           completed: boolean
           position: number
+          assigned_to: string | null
           created_at: string
           updated_at: string
         }
@@ -415,11 +416,13 @@ export type Database = {
           title: string
           completed?: boolean
           position?: number
+          assigned_to?: string | null
         }
         Update: {
           title?: string
           completed?: boolean
           position?: number
+          assigned_to?: string | null
         }
       }
       comments: {

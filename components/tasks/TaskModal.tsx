@@ -778,18 +778,62 @@ export function TaskModal({
                 <div className="flex-1 overflow-y-auto p-4">
                   {activeTab === 'details' && (
                     <div className="space-y-4">
-                      {/* Subtask Progress */}
-                      {totalSubtasks > 0 && (
+                      {/* Subtask Progress - Prominent Display */}
+                      <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-semibold text-gray-800 dark:text-white">Task Progress</span>
+                          <span className={`text-2xl font-bold ${
+                            subtaskProgress >= 100 ? 'text-green-600 dark:text-green-400' :
+                            subtaskProgress >= 50 ? 'text-blue-600 dark:text-blue-400' :
+                            'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {Math.round(subtaskProgress)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              subtaskProgress >= 100 ? 'bg-green-500' :
+                              subtaskProgress >= 50 ? 'bg-blue-500' :
+                              'bg-blue-400'
+                            }`}
+                            style={{ width: `${subtaskProgress}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <span>{completedSubtasks} of {totalSubtasks} subtasks completed</span>
+                          {subtaskProgress >= 100 && (
+                            <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                              Complete
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Assignees Summary */}
+                      {taskDetails.assignees && taskDetails.assignees.length > 0 && (
                         <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                          <div className="flex justify-between text-sm mb-2">
-                            <span className="font-medium text-gray-700 dark:text-gray-300">Progress</span>
-                            <span className="text-gray-500 dark:text-gray-400">{Math.round(subtaskProgress)}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${subtaskProgress}%` }}
-                            />
+                          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Assigned To</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {taskDetails.assignees.map((assignee) => (
+                              <div key={assignee.id} className="flex items-center gap-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                {assignee.avatar_url ? (
+                                  <img src={assignee.avatar_url} alt={assignee.full_name || ''} className="w-5 h-5 rounded-full" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <span className="text-xs text-white font-medium">
+                                      {(assignee.full_name || assignee.email)[0].toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                <span className="text-xs text-gray-700 dark:text-gray-300">
+                                  {assignee.full_name || assignee.email}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -804,9 +848,9 @@ export function TaskModal({
                         </div>
                       )}
 
-                      {totalSubtasks === 0 && taskDetails.time_spent === 0 && (
+                      {totalSubtasks === 0 && taskDetails.time_spent === 0 && !taskDetails.assignees?.length && (
                         <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                          No additional details yet
+                          No additional details yet. Add subtasks to track progress.
                         </p>
                       )}
                     </div>
@@ -866,25 +910,97 @@ export function TaskModal({
                         )}
                       </div>
 
+                      {/* Subtasks Progress Mini */}
+                      {taskDetails.subtasks.length > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                subtaskProgress >= 100 ? 'bg-green-500' : 'bg-blue-500'
+                              }`}
+                              style={{ width: `${subtaskProgress}%` }}
+                            />
+                          </div>
+                          <span className="font-medium">{Math.round(subtaskProgress)}%</span>
+                        </div>
+                      )}
+
                       {/* Subtasks List */}
                       <div className="space-y-2">
-                        {taskDetails.subtasks.map((subtask) => (
-                          <div key={subtask.id} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={subtask.completed}
-                              onChange={(e) => toggleSubtask(subtask.id, e.target.checked)}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-                            />
-                            <span
-                              className={`flex-1 text-sm ${
-                                subtask.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              <MentionText text={subtask.title} />
-                            </span>
-                          </div>
-                        ))}
+                        {taskDetails.subtasks.map((subtask) => {
+                          const assignee = subtask.assignee
+
+                          return (
+                            <div key={subtask.id} className="group flex items-start gap-2 p-2.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={subtask.completed}
+                                onChange={(e) => toggleSubtask(subtask.id, e.target.checked)}
+                                className="h-4 w-4 mt-0.5 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span
+                                  className={`text-sm block ${
+                                    subtask.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'
+                                  }`}
+                                >
+                                  <MentionText text={subtask.title} />
+                                </span>
+                                {/* Assignee display and selector */}
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  {assignee ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full">
+                                      {assignee.avatar_url ? (
+                                        <img src={assignee.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                                      ) : (
+                                        <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                                          <span className="text-[10px] text-white font-medium">
+                                            {(assignee.full_name || assignee.email)[0].toUpperCase()}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <span className="text-xs text-blue-700 dark:text-blue-300">
+                                        {assignee.full_name || assignee.email}
+                                      </span>
+                                      {!readOnly && (
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await TaskService.updateSubtask(subtask.id, { assigned_to: null })
+                                            loadTaskDetails(taskDetails.id)
+                                          }}
+                                          className="text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </span>
+                                  ) : !readOnly && projectMembers.length > 0 && (
+                                    <select
+                                      className="text-xs px-2 py-0.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-gray-600 dark:text-gray-400 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                      value=""
+                                      onChange={async (e) => {
+                                        if (e.target.value) {
+                                          await TaskService.updateSubtask(subtask.id, { assigned_to: e.target.value })
+                                          loadTaskDetails(taskDetails.id)
+                                        }
+                                      }}
+                                    >
+                                      <option value="">Assign to...</option>
+                                      {projectMembers.map((member) => (
+                                        <option key={member.user_id} value={member.user_id}>
+                                          {member.user.full_name || member.user.email}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
                         {taskDetails.subtasks.length === 0 && (
                           <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                             No subtasks yet

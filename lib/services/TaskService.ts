@@ -45,7 +45,14 @@ export interface TaskWithDetails extends Task {
     email: string
     avatar_url: string | null
   }>
-  subtasks: Subtask[]
+  subtasks: Array<Subtask & {
+    assignee?: {
+      id: string
+      full_name: string | null
+      email: string
+      avatar_url: string | null
+    } | null
+  }>
   comments_count: number
   attachments: Attachment[]
   time_entries: TimeEntry[]
@@ -108,10 +115,13 @@ export class TaskService {
       `)
       .eq('task_id', taskId)
 
-    // Get subtasks
+    // Get subtasks with assignee info
     const { data: subtasks } = await supabase
       .from('subtasks')
-      .select('*')
+      .select(`
+        *,
+        assignee:profiles!subtasks_assigned_to_fkey(id, full_name, email, avatar_url)
+      `)
       .eq('task_id', taskId)
       .order('created_at', { ascending: true })
 
