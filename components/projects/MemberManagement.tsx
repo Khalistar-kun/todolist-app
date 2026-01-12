@@ -221,6 +221,9 @@ export default function MemberManagement({ projectId, currentUserId }: MemberMan
             </label>
             <input
               type="email"
+              id="invite_email"
+              name="invite_email"
+              autoComplete="email"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="colleague@example.com"
@@ -233,6 +236,8 @@ export default function MemberManagement({ projectId, currentUserId }: MemberMan
               Role
             </label>
             <select
+              id="invite_role"
+              name="invite_role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as ProjectRole)}
               className="input w-full"

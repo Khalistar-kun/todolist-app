@@ -294,6 +294,8 @@ export default function ProfilePage() {
                   </label>
                   <input
                     type="url"
+                    id="avatar_url"
+                    name="avatar_url"
                     value={profile.avatar_url?.startsWith('data:') ? '' : (profile.avatar_url || '')}
                     onChange={(e) => setProfile({ ...profile, avatar_url: e.target.value })}
                     placeholder="https://example.com/avatar.jpg"
@@ -316,6 +318,9 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="text"
+                  id="full_name"
+                  name="full_name"
+                  autoComplete="name"
                   value={profile.full_name || ''}
                   onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
                   placeholder="Enter your full name"
@@ -329,6 +334,9 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="email"
+                  id="email"
+                  name="email"
+                  autoComplete="email"
                   value={user?.email || ''}
                   disabled
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
@@ -343,6 +351,8 @@ export default function ProfilePage() {
                   Bio
                 </label>
                 <textarea
+                  id="bio"
+                  name="bio"
                   value={profile.bio || ''}
                   onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
                   placeholder="Tell us a little about yourself..."

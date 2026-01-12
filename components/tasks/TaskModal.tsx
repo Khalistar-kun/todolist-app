@@ -394,6 +394,7 @@ export function TaskModal({
                   <input
                     type="text"
                     id="title"
+                    name="title"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
@@ -428,6 +429,7 @@ export function TaskModal({
                     </label>
                     <select
                       id="priority"
+                      name="priority"
                       value={formData.priority}
                       onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
                       className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none cursor-pointer disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
@@ -449,6 +451,7 @@ export function TaskModal({
                     <input
                       type="datetime-local"
                       id="due_date"
+                      name="due_date"
                       value={formData.due_date}
                       onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                       className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
@@ -464,6 +467,7 @@ export function TaskModal({
                   </label>
                   <select
                     id="stage"
+                    name="stage"
                     value={formData.stage_id}
                     onChange={(e) => setFormData({ ...formData, stage_id: e.target.value })}
                     className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none cursor-pointer disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"

@@ -29,11 +29,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Auth loading timeout (10 seconds max)
-const AUTH_TIMEOUT_MS = 10000
+// Auth loading timeout - reduced to 5 seconds, but we handle timeout differently now
+const AUTH_TIMEOUT_MS = 5000
 
 // Visibility refresh debounce (prevent rapid refreshes)
 const VISIBILITY_DEBOUNCE_MS = 2000
+
+// Fast initial check timeout - give local storage check 500ms max
+const FAST_CHECK_TIMEOUT_MS = 500
 
 // Clear all user-related data from localStorage
 function clearUserStorage(userId?: string) {
@@ -171,12 +174,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializedRef.current = true
 
     // Set a timeout to prevent infinite loading
+    // IMPORTANT: On timeout, we DON'T set user to null - we just stop loading
+    // This prevents showing logged-out UI when we're just slow
     timeoutRef.current = setTimeout(() => {
       if (status === 'loading') {
-        console.warn('[Auth] Auth loading timed out after', AUTH_TIMEOUT_MS, 'ms')
-        // IMPORTANT: On timeout, don't assume logged out - stay in loading state
-        // but stop the spinner. User can refresh to retry.
-        setAuthState(null, false)
+        console.warn('[Auth] Auth loading timed out after', AUTH_TIMEOUT_MS, 'ms - keeping current state')
+        // CRITICAL FIX: Only stop loading, don't change user state
+        // If we have a user from preliminary check, keep them
+        // This prevents the flash to logout on slow connections
+        setLoading(false)
+        setStatus(user ? 'authenticated' : 'unauthenticated')
       }
     }, AUTH_TIMEOUT_MS)
 

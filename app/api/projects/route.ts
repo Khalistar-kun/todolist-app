@@ -249,12 +249,15 @@ export async function GET(request: NextRequest) {
           || workflowStages[workflowStages.length - 1]
         const doneStageId = doneStage?.id || 'done'
 
-        // Count completed tasks (in Done stage AND approved)
+        // Count completed tasks (in Done stage)
+        // A task is "completed" if it's in the Done stage and either:
+        // 1. Has approval_status = 'approved', OR
+        // 2. Has no approval_status set (null/undefined) - meaning it doesn't require approval
         const completedTasksCount = tasks?.filter((t: any) =>
-          t.stage_id === doneStageId && t.approval_status === 'approved'
+          t.stage_id === doneStageId && (t.approval_status === 'approved' || t.approval_status === null || t.approval_status === undefined)
         ).length || 0
 
-        // Count pending approval tasks
+        // Count pending approval tasks (in Done stage with explicit pending status)
         const pendingApprovalCount = tasks?.filter((t: any) =>
           t.stage_id === doneStageId && t.approval_status === 'pending'
         ).length || 0
