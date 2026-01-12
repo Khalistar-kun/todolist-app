@@ -160,29 +160,32 @@ export class ReportingService {
       `)
       .eq('task.project_id', projectId)
 
-    // Get member info
+    // Get member info (without JOIN to avoid issues)
     const { data: members } = await supabase
       .from('project_members')
-      .select(`
-        user_id,
-        user:profiles (
-          full_name,
-          email,
-          avatar_url
-        )
-      `)
+      .select('user_id')
       .eq('project_id', projectId)
+
+    // Fetch profiles separately
+    const memberUserIds = members?.map(m => m.user_id) || []
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', memberUserIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     const now = new Date()
     const memberMap = new Map<string, TeamMemberStats>()
 
     // Initialize member stats
     members?.forEach(member => {
+      const profile = profileMap.get(member.user_id)
       memberMap.set(member.user_id, {
         user_id: member.user_id,
-        user_name: (member.user as any)?.full_name || (member.user as any)?.email || 'Unknown',
-        user_email: (member.user as any)?.email || '',
-        avatar_url: (member.user as any)?.avatar_url || null,
+        user_name: profile?.full_name || profile?.email || 'Unknown',
+        user_email: profile?.email || '',
+        avatar_url: profile?.avatar_url || null,
         tasks_assigned: 0,
         tasks_completed: 0,
         tasks_overdue: 0,

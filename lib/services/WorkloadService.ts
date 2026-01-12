@@ -46,18 +46,24 @@ export class WorkloadService {
     const nextWeekEnd = new Date(weekEnd)
     nextWeekEnd.setDate(nextWeekEnd.getDate() + 7)
 
-    // Get project members
+    // Get project members (without JOIN to avoid issues)
     const { data: members } = await supabase
       .from('project_members')
-      .select(`
-        user_id,
-        user:profiles (
-          full_name,
-          email,
-          avatar_url
-        )
-      `)
+      .select('user_id')
       .eq('project_id', projectId)
+
+    if (!members || members.length === 0) {
+      return []
+    }
+
+    // Get profiles for all members separately
+    const memberUserIds = members.map(m => m.user_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', memberUserIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     // Get task assignments with task details
     const { data: assignments } = await supabase
@@ -97,6 +103,7 @@ export class WorkloadService {
     const workloads: UserWorkload[] = []
 
     for (const member of members || []) {
+      const profile = profileMap.get(member.user_id)
       const userAssignments = assignments?.filter(a =>
         a.user_id === member.user_id
       ) || []
@@ -149,9 +156,9 @@ export class WorkloadService {
 
       workloads.push({
         user_id: member.user_id,
-        user_name: (member.user as any)?.full_name || (member.user as any)?.email || 'Unknown',
-        user_email: (member.user as any)?.email || '',
-        avatar_url: (member.user as any)?.avatar_url || null,
+        user_name: profile?.full_name || profile?.email || 'Unknown',
+        user_email: profile?.email || '',
+        avatar_url: profile?.avatar_url || null,
         tasks_this_week: tasksThisWeek,
         tasks_next_week: tasksNextWeek,
         overdue_tasks: overdueTasks,

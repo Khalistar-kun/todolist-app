@@ -312,11 +312,21 @@ export class AITaskService {
   static async getWorkloadRecommendations(projectId: string): Promise<WorkloadRecommendation[]> {
     const { data: members } = await supabase
       .from('project_members')
-      .select(`
-        user_id,
-        user:profiles (full_name, email)
-      `)
+      .select('user_id')
       .eq('project_id', projectId)
+
+    if (!members || members.length === 0) {
+      return []
+    }
+
+    // Fetch profiles separately
+    const memberUserIds = members.map(m => m.user_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', memberUserIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     const { data: assignments } = await supabase
       .from('task_assignments')
@@ -339,7 +349,7 @@ export class AITaskService {
     const targetLoad = 40 // hours per week
 
     for (const member of members || []) {
-      const user = member.user as any
+      const profile = profileMap.get(member.user_id)
       const userAssignments = assignments?.filter(a =>
         a.user_id === member.user_id &&
         (a.task as any)?.project_id === projectId &&
@@ -361,7 +371,7 @@ export class AITaskService {
 
       recommendations.push({
         user_id: member.user_id,
-        user_name: user?.full_name || user?.email || 'Unknown',
+        user_name: profile?.full_name || profile?.email || 'Unknown',
         current_load: loadPercentage,
         recommended_action: action,
       })
