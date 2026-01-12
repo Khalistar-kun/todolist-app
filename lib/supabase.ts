@@ -243,17 +243,149 @@ export type Database = {
           id: string
           task_id: string
           user_id: string
+          role: 'owner' | 'assignee' | 'reviewer' | 'collaborator'
           assigned_by: string | null
           assigned_at: string
         }
         Insert: {
           task_id: string
           user_id: string
+          role?: 'owner' | 'assignee' | 'reviewer' | 'collaborator'
           assigned_by?: string | null
         }
         Update: {
           user_id?: string
+          role?: 'owner' | 'assignee' | 'reviewer' | 'collaborator'
           assigned_by?: string | null
+        }
+      }
+      task_dependencies: {
+        Row: {
+          id: string
+          blocking_task_id: string
+          blocked_task_id: string
+          dependency_type: 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish'
+          lag_days: number
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          blocking_task_id: string
+          blocked_task_id: string
+          dependency_type?: 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish'
+          lag_days?: number
+          created_by?: string | null
+        }
+        Update: {
+          dependency_type?: 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish'
+          lag_days?: number
+        }
+      }
+      milestones: {
+        Row: {
+          id: string
+          project_id: string
+          name: string
+          description: string | null
+          target_date: string
+          completed_at: string | null
+          color: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          project_id: string
+          name: string
+          description?: string | null
+          target_date: string
+          color?: string
+          created_by?: string | null
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          target_date?: string
+          completed_at?: string | null
+          color?: string
+        }
+      }
+      portfolios: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          description: string | null
+          color: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          name: string
+          description?: string | null
+          color?: string
+          created_by?: string | null
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          color?: string
+        }
+      }
+      portfolio_projects: {
+        Row: {
+          portfolio_id: string
+          project_id: string
+          display_order: number
+          added_at: string
+        }
+        Insert: {
+          portfolio_id: string
+          project_id: string
+          display_order?: number
+        }
+        Update: {
+          display_order?: number
+        }
+      }
+      task_recurrences: {
+        Row: {
+          id: string
+          task_id: string
+          frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'custom'
+          interval_value: number
+          days_of_week: number[] | null
+          day_of_month: number | null
+          end_date: string | null
+          max_occurrences: number | null
+          occurrences_created: number
+          next_occurrence_date: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          task_id: string
+          frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'custom'
+          interval_value?: number
+          days_of_week?: number[] | null
+          day_of_month?: number | null
+          end_date?: string | null
+          max_occurrences?: number | null
+          next_occurrence_date?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'custom'
+          interval_value?: number
+          days_of_week?: number[] | null
+          day_of_month?: number | null
+          end_date?: string | null
+          max_occurrences?: number | null
+          occurrences_created?: number
+          next_occurrence_date?: string | null
+          is_active?: boolean
         }
       }
       subtasks: {
@@ -333,25 +465,28 @@ export type Database = {
           id: string
           task_id: string
           user_id: string
-          duration: number
+          duration: number | null
           description: string | null
           started_at: string | null
           ended_at: string | null
+          is_running: boolean
           created_at: string
         }
         Insert: {
           task_id: string
           user_id: string
-          duration: number
+          duration?: number | null
           description?: string | null
           started_at?: string | null
           ended_at?: string | null
+          is_running?: boolean
         }
         Update: {
-          duration?: number
+          duration?: number | null
           description?: string | null
           started_at?: string | null
           ended_at?: string | null
+          is_running?: boolean
         }
       }
       activity_logs: {
@@ -418,6 +553,11 @@ export type Organization = Database['public']['Tables']['organizations']['Row']
 export type Project = Database['public']['Tables']['projects']['Row']
 export type Task = Database['public']['Tables']['tasks']['Row']
 export type TaskAssignment = Database['public']['Tables']['task_assignments']['Row']
+export type TaskDependency = Database['public']['Tables']['task_dependencies']['Row']
+export type Milestone = Database['public']['Tables']['milestones']['Row']
+export type Portfolio = Database['public']['Tables']['portfolios']['Row']
+export type PortfolioProject = Database['public']['Tables']['portfolio_projects']['Row']
+export type TaskRecurrence = Database['public']['Tables']['task_recurrences']['Row']
 export type Subtask = Database['public']['Tables']['subtasks']['Row']
 export type Comment = Database['public']['Tables']['comments']['Row']
 export type Attachment = Database['public']['Tables']['attachments']['Row']
@@ -425,20 +565,68 @@ export type TimeEntry = Database['public']['Tables']['time_entries']['Row']
 export type ActivityLog = Database['public']['Tables']['activity_logs']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
 
+// Task assignment role type
+export type TaskAssignmentRole = 'owner' | 'assignee' | 'reviewer' | 'collaborator'
+
+// Extended task assignment with user details
+export type TaskAssignmentWithUser = TaskAssignment & {
+  user: Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'>
+}
+
 // Extended types with relationships
 export type TaskWithDetails = Task & {
   project: Pick<Project, 'id' | 'name' | 'color'>
-  assignees: Array<{ id: string; full_name: string | null; avatar_url: string | null }>
+  assignees: Array<{
+    id: string
+    full_name: string | null
+    avatar_url: string | null
+    role?: TaskAssignmentRole
+  }>
   subtasks: Subtask[]
   comments_count: number
   attachments_count: number
   time_spent: number
+  // New fields
+  start_date?: string | null
+  estimated_hours?: number | null
+  parent_task_id?: string | null
+  milestone_id?: string | null
+  is_blocked?: boolean
+  blocking_tasks?: Array<{ id: string; title: string; stage_id: string }>
+  blocked_tasks?: Array<{ id: string; title: string; stage_id: string }>
+  running_timer?: TimeEntry | null
 }
 
 export type ProjectWithDetails = Project & {
   members_count: number
   tasks_count: number
   completed_tasks_count: number
+  pending_approval_count?: number
+  overdue_tasks_count?: number
+  blocked_tasks_count?: number
+}
+
+// Portfolio with projects
+export type PortfolioWithProjects = Portfolio & {
+  projects: Array<ProjectWithDetails & { display_order: number }>
+}
+
+// Milestone with linked tasks
+export type MilestoneWithTasks = Milestone & {
+  tasks_count: number
+  completed_tasks_count: number
+  progress_percent: number
+}
+
+// Workflow stage with WIP limit
+export type WorkflowStage = {
+  id: string
+  name: string
+  color: string
+  wip_limit?: number | null
+  wip_limit_type?: 'warning' | 'strict'
+  is_done_stage?: boolean
+  is_default?: boolean
 }
 
 export type User = Profile & {
