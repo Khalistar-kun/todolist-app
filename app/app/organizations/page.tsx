@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { useSound } from '@/hooks/useSound'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
 import Image from 'next/image'
@@ -51,8 +51,8 @@ function OrganizationsSkeleton() {
 
 export default function OrganizationsPage() {
   const router = useRouter()
-  // CRITICAL: Use isInitialized to block render until auth resolves
-  const { user, status, isInitialized } = useAuth()
+  // CRITICAL: Use status to check auth state
+  const { user, status } = useAuth()
   const { playClick, playSuccess } = useSound()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -174,7 +174,7 @@ export default function OrganizationsPage() {
   // 3. Unauthenticated → show login prompt (only after auth is resolved)
   // 4. Authenticated with data → show content
 
-  if (!isInitialized || status === 'loading') {
+  if (status === 'loading') {
     return <OrganizationsSkeleton />
   }
 

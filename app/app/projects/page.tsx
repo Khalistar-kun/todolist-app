@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { ProjectService } from '@/lib/services/ProjectService'
 import type { ProjectWithMembers } from '@/lib/services/ProjectService'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
@@ -53,8 +53,8 @@ function ProjectsSkeleton() {
 }
 
 export default function ProjectsPage() {
-  // CRITICAL: Use isInitialized to block render until auth resolves
-  const { user, status, isInitialized } = useAuth()
+  // CRITICAL: Use status to check auth state
+  const { user, status } = useAuth()
   const [projects, setProjects] = useState<ProjectWithMembers[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const isInitialLoadRef = useRef(true)
@@ -109,7 +109,7 @@ export default function ProjectsPage() {
   // 3. Unauthenticated → show login prompt
   // 4. Authenticated with data → show content
 
-  if (!isInitialized || status === 'loading') {
+  if (status === 'loading') {
     return <ProjectsSkeleton />
   }
 

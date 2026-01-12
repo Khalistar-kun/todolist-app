@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import toast from 'react-hot-toast'
 
 const DEFAULT_WORKFLOW_STAGES = [

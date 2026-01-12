@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import type { Profile } from '@/lib/supabase'
 import { useSound } from '@/hooks/useSound'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'

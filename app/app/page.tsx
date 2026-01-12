@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import type { Project, Task } from '@/lib/supabase'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
@@ -80,8 +80,8 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
-  // CRITICAL: Use status and isInitialized as primary auth indicators
-  const { user, status, isInitialized } = useAuth()
+  // CRITICAL: Use status as primary auth indicator
+  const { user, status } = useAuth()
   const { playClick } = useSound()
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -288,7 +288,7 @@ export default function Dashboard() {
   // 4. Authenticated with data → show dashboard
 
   // Check 1: Auth is not yet initialized - show skeleton, never any auth-dependent UI
-  if (!isInitialized || status === 'loading') {
+  if (status === 'loading') {
     return <DashboardSkeleton />
   }
 

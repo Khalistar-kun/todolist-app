@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import type { Organization, Profile } from '@/lib/supabase'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
@@ -59,8 +59,8 @@ function TeamSkeleton() {
 
 export default function TeamPage() {
   const router = useRouter()
-  // CRITICAL: Use isInitialized to block render until auth resolves
-  const { user, status, isInitialized } = useAuth()
+  // CRITICAL: Use status to check auth state
+  const { user, status } = useAuth()
   const { playClick, playSuccess } = useSound()
   const [organizations, setOrganizations] = useState<OrganizationWithMembers[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -237,7 +237,7 @@ export default function TeamPage() {
   // 3. Unauthenticated → show login prompt (only after auth is resolved)
   // 4. Authenticated with data → show content
 
-  if (!isInitialized || status === 'loading') {
+  if (status === 'loading') {
     return <TeamSkeleton />
   }
 

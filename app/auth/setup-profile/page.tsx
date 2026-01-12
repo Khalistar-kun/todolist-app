@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
 
 export default function SetupProfilePage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, status } = useAuth()
   const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
@@ -16,11 +16,13 @@ export default function SetupProfilePage() {
   const [loading, setLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const authLoading = status === 'loading'
+
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (status === 'unauthenticated') {
       router.push('/auth/signin')
     }
-  }, [user, authLoading, router])
+  }, [status, router])
 
   // Load existing profile data
   useEffect(() => {

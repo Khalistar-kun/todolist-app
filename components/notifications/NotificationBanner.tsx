@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
 
 interface NotificationData {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import type { Comment } from '@/lib/supabase'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'

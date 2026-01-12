@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import type { Task, Project } from '@/lib/supabase'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
@@ -53,7 +53,7 @@ function TasksSkeleton() {
 const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 }
 
 export default function MyTasksPage() {
-  const { user, status, isInitialized } = useAuth()
+  const { user, status } = useAuth()
   const { playClick, playToggle } = useSound()
   const [tasks, setTasks] = useState<TaskWithProject[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -348,7 +348,7 @@ export default function MyTasksPage() {
     }).length,
   }
 
-  if (!isInitialized || status === 'loading') {
+  if (status === 'loading') {
     return <TasksSkeleton />
   }
 

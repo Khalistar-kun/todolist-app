@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { useThemeSafe } from '@/contexts/ThemeContext'
 import { OrganizationSlackIntegration } from '@/components/organizations/OrganizationSlackIntegration'
 import toast from 'react-hot-toast'

@@ -1,8 +1,8 @@
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthProvider } from '@/app/providers/AuthProvider'
+import { RealtimeProvider } from '@/app/providers/RealtimeProvider'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import { RealtimeProvider } from '@/contexts/RealtimeContext'
 
 export const metadata = {
   title: 'TodoApp - Organize your work and life',

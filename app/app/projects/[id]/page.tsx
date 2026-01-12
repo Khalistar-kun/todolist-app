@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { ProjectService, type ProjectWithMembers } from '@/lib/services/ProjectService'
 import { TaskService } from '@/lib/services/TaskService'
 import type { Task } from '@/lib/supabase'
