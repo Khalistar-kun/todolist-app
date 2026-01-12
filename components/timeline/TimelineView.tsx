@@ -162,7 +162,7 @@ export function TimelineView({
 
     return {
       left: `${startDays * pixelsPerDay}px`,
-      width: `${Math.max(durationDays * pixelsPerDay, 20)}px`,
+      width: `${Math.max(durationDays * pixelsPerDay, 80)}px`, // Minimum 80px for readability
     }
   }
 
@@ -250,19 +250,19 @@ export function TimelineView({
             <div
               key={task.id}
               onClick={() => onTaskClick?.(task)}
-              className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 cursor-pointer transition-colors"
+              className="px-3 py-3 h-16 border-b border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 cursor-pointer transition-colors flex flex-col justify-center"
             >
               <div className="flex items-center gap-2">
                 <div
-                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: getTaskColor(task) }}
                 />
-                <span className={`text-sm truncate ${isTaskCompleted(task) ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                <span className={`font-medium truncate ${isTaskCompleted(task) ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
                   {task.title}
                 </span>
               </div>
               {task.due_date && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 ml-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-5">
                   Due: {new Date(task.due_date).toLocaleDateString()}
                 </div>
               )}
@@ -278,14 +278,14 @@ export function TimelineView({
                 <div
                   key={task.id}
                   onClick={() => onTaskClick?.(task)}
-                  className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 cursor-pointer transition-colors opacity-60"
+                  className="px-3 py-3 h-14 border-b border-gray-100 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 cursor-pointer transition-colors opacity-60 flex items-center"
                 >
                   <div className="flex items-center gap-2">
                     <div
-                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: getTaskColor(task) }}
                     />
-                    <span className="text-sm truncate text-gray-600 dark:text-gray-400">
+                    <span className="font-medium truncate text-gray-600 dark:text-gray-400">
                       {task.title}
                     </span>
                   </div>
@@ -363,7 +363,7 @@ export function TimelineView({
                 return (
                   <div
                     key={task.id}
-                    className="relative h-10 border-b border-gray-100 dark:border-gray-800"
+                    className="relative h-16 border-b border-gray-100 dark:border-gray-800"
                   >
                     {/* Grid lines */}
                     <div className="absolute inset-0 flex">
@@ -380,7 +380,7 @@ export function TimelineView({
 
                     {/* Task bar */}
                     <div
-                      className={`absolute top-1.5 h-7 rounded cursor-pointer transition-all hover:brightness-110 ${
+                      className={`absolute top-2 h-12 rounded-lg cursor-pointer transition-all hover:brightness-110 hover:shadow-lg ${
                         isBlocked ? 'opacity-60' : ''
                       }`}
                       style={{
@@ -390,19 +390,19 @@ export function TimelineView({
                       onClick={() => onTaskClick?.(task)}
                       title={task.title}
                     >
-                      <div className="px-2 py-1 text-xs text-white truncate font-medium">
+                      <div className="px-3 py-2 text-sm text-white truncate font-semibold drop-shadow-sm">
                         {task.title}
                       </div>
                       {isCompleted && (
-                        <div className="absolute inset-0 bg-black/20 rounded flex items-center justify-center">
-                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                        <div className="absolute inset-0 bg-black/20 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white drop-shadow" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                           </svg>
                         </div>
                       )}
                       {isBlocked && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center shadow">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                           </svg>
                         </div>
