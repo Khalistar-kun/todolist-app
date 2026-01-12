@@ -277,6 +277,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser,
   }
 
+  // CRITICAL: Block ALL children from rendering until auth is resolved
+  // This prevents hooks from running, subscriptions from being created,
+  // and any auth-dependent logic from executing before we know the auth state
+  if (!isInitialized) {
+    return (
+      <AuthContext.Provider value={value}>
+        {/* Minimal loading state - no children render yet */}
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      </AuthContext.Provider>
+    )
+  }
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

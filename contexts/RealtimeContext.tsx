@@ -98,34 +98,58 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Set up channel when authenticated
+  // Track user ID for logout detection
+  const currentUserIdRef = useRef<string | null>(null)
+
+  // Set up channel ONCE when authenticated
+  // CRITICAL: This effect should NOT re-run on normal state changes
   useEffect(() => {
     // Don't do anything until auth is initialized
     if (!isInitialized) return
 
-    // Only set up channel when authenticated
-    if (status !== 'authenticated' || !user) {
-      // Clean up channel on logout
+    const userId = user?.id || null
+    const wasAuthenticated = currentUserIdRef.current !== null
+    const isAuthenticated = status === 'authenticated' && userId !== null
+
+    // Case 1: User logged out - clean up channel
+    if (wasAuthenticated && !isAuthenticated) {
       if (channelRef.current && !isCleaningUpRef.current) {
         isCleaningUpRef.current = true
-        console.log('[Realtime] Cleaning up channel - user logged out')
+        console.log('[Realtime] User logged out - destroying channel')
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
         isSetupRef.current = false
+        currentUserIdRef.current = null
         setIsConnected(false)
         isCleaningUpRef.current = false
       }
       return
     }
 
-    // Don't set up if already done
-    if (isSetupRef.current && channelRef.current) return
+    // Case 2: User changed (different user logged in) - recreate channel
+    if (wasAuthenticated && isAuthenticated && currentUserIdRef.current !== userId) {
+      if (channelRef.current) {
+        console.log('[Realtime] User changed - recreating channel')
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+        isSetupRef.current = false
+      }
+    }
 
+    // Case 3: Not authenticated - nothing to do
+    if (!isAuthenticated) return
+
+    // Case 4: Already set up for this user - nothing to do
+    if (isSetupRef.current && channelRef.current && currentUserIdRef.current === userId) {
+      return
+    }
+
+    // Set up new channel
+    currentUserIdRef.current = userId
     isSetupRef.current = true
-    console.log('[Realtime] Setting up centralized channel')
+    console.log('[Realtime] Creating channel for user:', userId)
 
-    // Create single channel for all tables
-    const channelName = `app-realtime-${user.id}`
+    const channelName = `app-realtime-${userId}`
     let channel = supabase.channel(channelName)
 
     // Subscribe to all supported tables
@@ -138,11 +162,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           handleChange(payload as RealtimePostgresChangesPayload<any>)
 
           // Also check for filtered handlers
-          // e.g., if someone subscribed with filter "user_id=eq.123"
           handlersRef.current.forEach((handlers, key) => {
             if (key.startsWith(`${table}:`)) {
               const filter = key.substring(table.length + 1)
-              // Simple filter matching - check if payload matches
               if (matchesFilter(payload, filter)) {
                 handlers.forEach(handler => {
                   try {
@@ -159,17 +181,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     })
 
     // Subscribe to channel
-    channel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
+    channel.subscribe((subscribeStatus, err) => {
+      if (subscribeStatus === 'SUBSCRIBED') {
         console.log('[Realtime] Channel connected')
         setIsConnected(true)
-      } else if (status === 'CHANNEL_ERROR') {
+      } else if (subscribeStatus === 'CHANNEL_ERROR') {
         console.error('[Realtime] Channel error:', err)
         setIsConnected(false)
-      } else if (status === 'TIMED_OUT') {
+      } else if (subscribeStatus === 'TIMED_OUT') {
         console.error('[Realtime] Channel timed out')
         setIsConnected(false)
-      } else if (status === 'CLOSED') {
+      } else if (subscribeStatus === 'CLOSED') {
         console.log('[Realtime] Channel closed')
         setIsConnected(false)
       }
@@ -177,12 +199,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     channelRef.current = channel
 
-    // Cleanup only on unmount (app close) or user change
-    return () => {
-      // Note: We intentionally do NOT clean up here during normal navigation
-      // The channel should persist across page navigations
-      // Cleanup happens when user logs out (handled above)
-    }
+    // NO cleanup here - channel persists across effect re-runs
+    // Cleanup only happens on explicit logout (handled above)
   }, [user?.id, status, isInitialized, handleChange])
 
   // Cleanup on unmount (app close)
