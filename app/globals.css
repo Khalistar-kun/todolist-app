@@ -9,8 +9,6 @@
 @layer base {
   html {
     @apply antialiased scroll-smooth;
-    /* Prevent horizontal overflow on mobile */
-    overflow-x: hidden;
     /* Prevent pull-to-refresh in horizontal direction */
     overscroll-behavior-x: none;
   }
@@ -19,8 +17,6 @@
     @apply bg-gray-50 text-gray-900 font-sans;
     @apply dark:bg-gray-900 dark:text-gray-100;
     @apply transition-colors duration-200;
-    /* Prevent horizontal overflow on mobile */
-    overflow-x: hidden;
   }
 
   /* Scrollbar visibility - show on mobile for feedback, hide on desktop until hover */

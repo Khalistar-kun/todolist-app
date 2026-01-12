@@ -450,7 +450,8 @@ export function KanbanBoard({
       >
         <div
           ref={scrollContainerRef}
-          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-proximity sm:snap-none scroll-smooth touch-scroll tap-highlight-none"
+          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto overflow-y-hidden pb-4 px-1 -mx-1 snap-x snap-proximity sm:snap-none scroll-smooth touch-scroll tap-highlight-none"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {workflowStages.map((stage) => (
             <KanbanColumn

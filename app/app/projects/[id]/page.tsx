@@ -664,7 +664,7 @@ export default function ProjectPage() {
 
         {/* Tab Content */}
         {activeTab === 'board' && (
-          <>
+          <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
             {/* Pending Approval Filter Banner */}
             {showPendingOnly && (
               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center justify-between">
@@ -712,7 +712,7 @@ export default function ProjectPage() {
                 </p>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {activeTab === 'members' && (
