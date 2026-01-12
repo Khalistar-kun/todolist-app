@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] Initializing...')
 
       try {
-        // STEP 1: Check for existing session (instant, from cookies)
+        // STEP 1: Check for existing session from local storage (instant)
         const { data: { session: localSession } } = await supabase.auth.getSession()
 
         if (!localSession) {
@@ -139,46 +139,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // STEP 2: Session exists - set authenticated state immediately
-        // This prevents "flash to login" during slow network
-        const preliminaryUser: AuthUser = {
-          id: localSession.user.id,
-          email: localSession.user.email || '',
-          full_name: localSession.user.user_metadata?.full_name || null,
-          avatar_url: localSession.user.user_metadata?.avatar_url || null,
-          username: null,
-        }
+        // STEP 2: Session exists in local storage - MUST validate with server
+        // This is CRITICAL for soft refresh: cached session may be stale
+        console.log('[Auth] Local session found - validating with server...')
 
-        lastUserIdRef.current = preliminaryUser.id
-        setUser(preliminaryUser)
-        setStatus('authenticated')
-        setIsInitialized(true) // UI can now render
-        console.log('[Auth] Session found - authenticated (preliminary)')
-
-        // STEP 3: Validate with server and get full profile (background, non-blocking)
         try {
           const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
           if (!isMountedRef.current) return
 
           if (error || !authUser) {
-            // Session invalid on server - clear state
-            console.warn('[Auth] Session invalid:', error?.message)
+            // Session invalid on server - user must re-authenticate
+            console.warn('[Auth] Session invalid on server:', error?.message)
             lastUserIdRef.current = null
             setUser(null)
             setStatus('unauthenticated')
+            setIsInitialized(true)
             return
           }
 
-          // Get full profile
-          const profile = await getCurrentUser()
-          if (profile && isMountedRef.current) {
-            setUser(profile)
-            console.log('[Auth] Full profile loaded')
+          // STEP 3: Session is valid - set authenticated state
+          const preliminaryUser: AuthUser = {
+            id: authUser.id,
+            email: authUser.email || '',
+            full_name: authUser.user_metadata?.full_name || null,
+            avatar_url: authUser.user_metadata?.avatar_url || null,
+            username: null,
           }
-        } catch (error) {
-          console.error('[Auth] Background validation error:', error)
-          // Keep preliminary state on background errors
+
+          lastUserIdRef.current = preliminaryUser.id
+          setUser(preliminaryUser)
+          setStatus('authenticated')
+          setIsInitialized(true) // NOW UI can render - session is validated
+          console.log('[Auth] Session validated - authenticated')
+
+          // STEP 4: Get full profile (background, non-blocking)
+          try {
+            const profile = await getCurrentUser()
+            if (profile && isMountedRef.current) {
+              setUser(profile)
+              console.log('[Auth] Full profile loaded')
+            }
+          } catch (profileError) {
+            console.error('[Auth] Profile fetch error:', profileError)
+            // Keep preliminary user - auth is still valid
+          }
+        } catch (validationError) {
+          // Network error during validation - check if we should retry or fail
+          console.error('[Auth] Server validation failed:', validationError)
+          // On network failure, we cannot trust cached session
+          // Set unauthenticated to force re-login when network returns
+          lastUserIdRef.current = null
+          setUser(null)
+          setStatus('unauthenticated')
+          setIsInitialized(true)
         }
       } catch (error) {
         console.error('[Auth] Critical init error:', error)
