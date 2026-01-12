@@ -305,7 +305,7 @@ export function TaskCard({
           {menuOpen && (
             <div
               ref={menuRef}
-              className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+              className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Edit Task */}
@@ -334,7 +334,7 @@ export function TaskCard({
                     Color
                   </div>
                   <div className="px-3 pb-2">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       {TASK_COLORS.map((color) => (
                         <button
                           key={color.label}
@@ -343,7 +343,7 @@ export function TaskCard({
                             e.stopPropagation()
                             handleColorSelect(color.value)
                           }}
-                          className={`w-9 h-9 rounded-full border-2 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 tap-highlight-none ${
+                          className={`w-8 h-8 rounded-full border-2 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 tap-highlight-none flex items-center justify-center ${
                             task.color === color.value
                               ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
                               : 'border-gray-300 dark:border-gray-600'
@@ -353,12 +353,12 @@ export function TaskCard({
                           aria-label={`Set color to ${color.label}`}
                         >
                           {color.value === null && (
-                            <svg className="w-full h-full text-gray-400 dark:text-gray-500 p-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                             </svg>
                           )}
                           {task.color === color.value && color.value !== null && (
-                            <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
                           )}
