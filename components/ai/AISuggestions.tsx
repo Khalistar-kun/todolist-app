@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AITaskService, TaskSuggestion } from '@/lib/services/AITaskService'
 
 interface AISuggestionsProps {
@@ -66,7 +66,8 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
   const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([])
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
-  const [collapsed, setCollapsed] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function fetchSuggestions() {
@@ -84,110 +85,178 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     fetchSuggestions()
   }, [projectId])
 
+  // Close panel when clicking outside
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    // Close on escape key
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
   const handleDismiss = (id: string) => {
     setDismissed(prev => new Set([...prev, id]))
   }
 
   const visibleSuggestions = suggestions.filter(s => !dismissed.has(s.id))
 
-  if (loading) {
-    return (
-      <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-          ))}
-        </div>
-      </div>
-    )
+  // Don't render if no suggestions
+  if (!loading && visibleSuggestions.length === 0) {
+    return null
   }
 
-  if (visibleSuggestions.length === 0) {
-    return null // Don't show anything if no suggestions
+  // Count critical/warning for badge color
+  const criticalCount = visibleSuggestions.filter(s => s.severity === 'critical').length
+  const warningCount = visibleSuggestions.filter(s => s.severity === 'warning').length
+
+  const getBadgeColor = () => {
+    if (criticalCount > 0) return 'bg-red-500'
+    if (warningCount > 0) return 'bg-amber-500'
+    return 'bg-purple-500'
   }
 
   return (
-    <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-800 overflow-hidden">
-      {/* Header */}
+    <div ref={panelRef} className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      {/* Floating Action Button */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between p-4 hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 tap-highlight-none ${
+          isOpen
+            ? 'bg-purple-700 rotate-0'
+            : 'bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 hover:scale-105'
+        }`}
+        aria-label="AI Insights"
       >
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-          </svg>
-          <span className="font-medium text-gray-900 dark:text-white">AI Insights</span>
-          <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">
-            {visibleSuggestions.length}
-          </span>
-        </div>
+        {/* Sparkle Icon */}
         <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-180'}`}
+          className={`w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform duration-300 ${isOpen ? 'rotate-180 scale-90' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={2}
           stroke="currentColor"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          {isOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+          )}
         </svg>
+
+        {/* Badge with count */}
+        {!isOpen && visibleSuggestions.length > 0 && (
+          <span className={`absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 ${getBadgeColor()} rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md animate-pulse`}>
+            {visibleSuggestions.length}
+          </span>
+        )}
       </button>
 
-      {/* Content */}
-      {!collapsed && (
-        <div className="px-4 pb-4 space-y-2">
-          {visibleSuggestions.map(suggestion => {
-            const styles = SEVERITY_STYLES[suggestion.severity]
+      {/* Quest Panel */}
+      {isOpen && (
+        <div className="absolute bottom-16 sm:bottom-18 right-0 w-80 sm:w-96 max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-scale-in origin-bottom-right">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+              <span className="font-semibold text-white">AI Insights</span>
+              <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full">
+                {visibleSuggestions.length} {visibleSuggestions.length === 1 ? 'quest' : 'quests'}
+              </span>
+            </div>
+          </div>
 
-            return (
-              <div
-                key={suggestion.id}
-                className={`p-3 rounded-lg border ${styles.bg} ${styles.border}`}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Icon */}
-                  <div className={`flex-shrink-0 ${styles.icon}`}>
-                    {TYPE_ICONS[suggestion.type] || TYPE_ICONS.deadline_warning}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className={`font-medium text-sm ${styles.text}`}>
-                      {suggestion.title}
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                      {suggestion.description}
-                    </p>
-
-                    {/* Action Button */}
-                    {suggestion.action && (
-                      <button
-                        onClick={() => onActionClick?.(suggestion.action)}
-                        className="mt-2 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 rounded hover:bg-purple-200 dark:hover:bg-purple-900 transition-colors"
-                      >
-                        {suggestion.action.label}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Dismiss Button */}
-                  <button
-                    onClick={() => handleDismiss(suggestion.id)}
-                    className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
-                    title="Dismiss"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+          {/* Content */}
+          <div className="max-h-[calc(70vh-52px)] overflow-y-auto">
+            {loading ? (
+              <div className="p-4 space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-20 bg-gray-100 dark:bg-gray-700 rounded-lg animate-pulse" />
+                ))}
               </div>
-            )
-          })}
+            ) : (
+              <div className="p-3 space-y-2">
+                {visibleSuggestions.map(suggestion => {
+                  const styles = SEVERITY_STYLES[suggestion.severity]
+
+                  return (
+                    <div
+                      key={suggestion.id}
+                      className={`p-3 rounded-lg border ${styles.bg} ${styles.border} transition-all hover:shadow-md`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Icon */}
+                        <div className={`flex-shrink-0 mt-0.5 ${styles.icon}`}>
+                          {TYPE_ICONS[suggestion.type] || TYPE_ICONS.deadline_warning}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-medium text-sm ${styles.text}`}>
+                            {suggestion.title}
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
+                            {suggestion.description}
+                          </p>
+
+                          {/* Action Button */}
+                          {suggestion.action && (
+                            <button
+                              onClick={() => {
+                                onActionClick?.(suggestion.action)
+                                setIsOpen(false)
+                              }}
+                              className="mt-2 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors tap-highlight-none touch-target"
+                            >
+                              {suggestion.action.label}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Dismiss Button */}
+                        <button
+                          onClick={() => handleDismiss(suggestion.id)}
+                          className="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors tap-highlight-none"
+                          title="Dismiss"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Empty state after all dismissed */}
+                {visibleSuggestions.length === 0 && (
+                  <div className="py-8 text-center">
+                    <svg className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">All caught up!</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">No pending insights</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

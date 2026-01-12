@@ -865,10 +865,8 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {/* AI Insights */}
-            <div className="mt-6">
-              <AISuggestions projectId={projectId} onActionClick={handleAIActionClick} />
-            </div>
+            {/* AI Insights - Floating Quest Box */}
+            <AISuggestions projectId={projectId} onActionClick={handleAIActionClick} />
           </div>
         )}
 
