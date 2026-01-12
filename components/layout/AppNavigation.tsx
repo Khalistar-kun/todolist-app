@@ -301,7 +301,7 @@ export function AppNavigation() {
     // Update in database (fire and forget for better UX)
     supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ is_read: true })
       .eq('id', id)
       .then(({ error }) => {
         if (error) {
@@ -322,7 +322,7 @@ export function AppNavigation() {
     if (user?.id) {
       supabase
         .from('notifications')
-        .update({ read: true })
+        .update({ is_read: true })
         .eq('user_id', user.id)
         .then(({ error }) => {
           if (error) {

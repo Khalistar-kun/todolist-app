@@ -385,6 +385,146 @@ class EmailService {
   }
 
   /**
+   * Send a project invitation email
+   */
+  async sendProjectInvitationEmail(
+    to: string,
+    inviterName: string,
+    projectName: string,
+    role: string,
+    inviteToken: string
+  ): Promise<EmailResponse> {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://todolist-app-o9wc.vercel.app'
+    const inviteLink = `${baseUrl}/auth/signin?invite=${inviteToken}`
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Project Invitation - TodolistApp</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+          }
+          .content {
+            background: #f9f9f9;
+            padding: 30px;
+            border-radius: 0 0 10px 10px;
+          }
+          .button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+          }
+          .button:hover {
+            background: #2563eb;
+          }
+          .project-box {
+            background: #fff;
+            border: 2px solid #e5e7eb;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+          }
+          .project-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 8px;
+          }
+          .role-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>You're Invited!</h1>
+        </div>
+        <div class="content">
+          <p>Hi there,</p>
+          <p><strong>${inviterName}</strong> has invited you to collaborate on a project in TodolistApp.</p>
+
+          <div class="project-box">
+            <div class="project-name">${projectName}</div>
+            <span class="role-badge">Role: ${role.charAt(0).toUpperCase() + role.slice(1)}</span>
+          </div>
+
+          <p style="text-align: center;">
+            <a href="${inviteLink}" class="button">Accept Invitation</a>
+          </p>
+
+          <div class="info-box">
+            <p style="margin: 0;"><strong>What happens next?</strong></p>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+              <li>Click the button above to accept the invitation</li>
+              <li>Sign in or create an account if you don't have one</li>
+              <li>Start collaborating on the project immediately</li>
+            </ul>
+          </div>
+
+          <p style="color: #6b7280; font-size: 14px;">
+            This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+
+          <p>Best regards,<br>The TodolistApp Team</p>
+        </div>
+        <div class="footer">
+          <p>© 2025 TodolistApp. All rights reserved.</p>
+          <p>If you can't click the button, copy this link to your browser:</p>
+          <p style="word-break: break-all; color: #3b82f6;">${inviteLink}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return this.sendEmail({
+      to,
+      subject: `You've been invited to join "${projectName}" on TodolistApp`,
+      html,
+      text: `${inviterName} has invited you to join "${projectName}" as ${role}. Accept the invitation here: ${inviteLink}. This link expires in 7 days.`,
+    });
+  }
+
+  /**
    * Send a test email
    */
   async sendTestEmail(to: string): Promise<EmailResponse> {

@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { emailService } from '@/lib/email-service'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -133,7 +134,7 @@ export async function GET(
   }
 }
 
-// Helper function to send invitation email
+// Helper function to send invitation email using SMTP
 async function sendInvitationEmail(
   to: string,
   inviterName: string,
@@ -141,59 +142,22 @@ async function sendInvitationEmail(
   role: string,
   inviteToken: string
 ) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://todolist-app-o9wc.vercel.app'
-  const inviteLink = `${baseUrl}/auth/signin?invite=${inviteToken}`
-
-  // Use Resend for email (if configured)
-  const resendApiKey = process.env.RESEND_API_KEY
-  if (!resendApiKey) {
-    console.log('[Email] No RESEND_API_KEY configured, skipping email')
-    return false
-  }
-
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'TodoList <noreply@resend.dev>',
-        to: [to],
-        subject: `You've been invited to join "${projectName}"`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1f2937; margin-bottom: 16px;">Project Invitation</h2>
-            <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-              <strong>${inviterName}</strong> has invited you to join the project <strong>"${projectName}"</strong> as a <strong>${role}</strong>.
-            </p>
-            <div style="margin: 32px 0;">
-              <a href="${inviteLink}"
-                 style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
-                Accept Invitation
-              </a>
-            </div>
-            <p style="color: #6b7280; font-size: 14px;">
-              This invitation will expire in 7 days.
-            </p>
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-            <p style="color: #9ca3af; font-size: 12px;">
-              If you didn't expect this invitation, you can safely ignore this email.
-            </p>
-          </div>
-        `,
-      }),
-    })
+    const result = await emailService.sendProjectInvitationEmail(
+      to,
+      inviterName,
+      projectName,
+      role,
+      inviteToken
+    )
 
-    if (!response.ok) {
-      const error = await response.text()
-      console.error('[Email] Failed to send invitation email:', error)
+    if (result.success) {
+      console.log('[Email] Invitation email sent successfully to', to, 'messageId:', result.messageId)
+      return true
+    } else {
+      console.error('[Email] Failed to send invitation email:', result.error)
       return false
     }
-
-    console.log('[Email] Invitation email sent successfully to', to)
-    return true
   } catch (error) {
     console.error('[Email] Error sending invitation email:', error)
     return false
