@@ -929,6 +929,8 @@ export function TaskModal({
                       <div className="space-y-2">
                         {taskDetails.subtasks.map((subtask) => {
                           const assignee = subtask.assignee
+                          // Check if subtask has a mention - if so, don't show assign dropdown
+                          const hasMention = /@[a-zA-Z0-9_.-]+/.test(subtask.title)
 
                           return (
                             <div key={subtask.id} className="group flex items-start gap-2 p-2.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
@@ -946,57 +948,59 @@ export function TaskModal({
                                 >
                                   <MentionText text={subtask.title} />
                                 </span>
-                                {/* Assignee display and selector */}
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  {assignee ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full">
-                                      {assignee.avatar_url ? (
-                                        <img src={assignee.avatar_url} alt="" className="w-4 h-4 rounded-full" />
-                                      ) : (
-                                        <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                                          <span className="text-[10px] text-white font-medium">
-                                            {(assignee.full_name || assignee.email)[0].toUpperCase()}
-                                          </span>
-                                        </div>
-                                      )}
-                                      <span className="text-xs text-blue-700 dark:text-blue-300">
-                                        {assignee.full_name || assignee.email}
+                                {/* Assignee display and selector - only show if no mention in subtask */}
+                                {!hasMention && (
+                                  <div className="flex items-center gap-2 mt-1.5">
+                                    {assignee ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full">
+                                        {assignee.avatar_url ? (
+                                          <img src={assignee.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                                            <span className="text-[10px] text-white font-medium">
+                                              {(assignee.full_name || assignee.email)[0].toUpperCase()}
+                                            </span>
+                                          </div>
+                                        )}
+                                        <span className="text-xs text-blue-700 dark:text-blue-300">
+                                          {assignee.full_name || assignee.email}
+                                        </span>
+                                        {!readOnly && (
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              await TaskService.updateSubtask(subtask.id, { assigned_to: null })
+                                              loadTaskDetails(taskDetails.id)
+                                            }}
+                                            className="text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300"
+                                          >
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                          </button>
+                                        )}
                                       </span>
-                                      {!readOnly && (
-                                        <button
-                                          type="button"
-                                          onClick={async () => {
-                                            await TaskService.updateSubtask(subtask.id, { assigned_to: null })
+                                    ) : !readOnly && projectMembers.length > 0 && (
+                                      <select
+                                        className="text-xs px-2 py-0.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-gray-600 dark:text-gray-400 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        value=""
+                                        onChange={async (e) => {
+                                          if (e.target.value) {
+                                            await TaskService.updateSubtask(subtask.id, { assigned_to: e.target.value })
                                             loadTaskDetails(taskDetails.id)
-                                          }}
-                                          className="text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300"
-                                        >
-                                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                          </svg>
-                                        </button>
-                                      )}
-                                    </span>
-                                  ) : !readOnly && projectMembers.length > 0 && (
-                                    <select
-                                      className="text-xs px-2 py-0.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-gray-600 dark:text-gray-400 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                      value=""
-                                      onChange={async (e) => {
-                                        if (e.target.value) {
-                                          await TaskService.updateSubtask(subtask.id, { assigned_to: e.target.value })
-                                          loadTaskDetails(taskDetails.id)
-                                        }
-                                      }}
-                                    >
-                                      <option value="">Assign to...</option>
-                                      {projectMembers.map((member) => (
-                                        <option key={member.user_id} value={member.user_id}>
-                                          {member.user.full_name || member.user.email}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </div>
+                                          }
+                                        }}
+                                      >
+                                        <option value="">Assign to...</option>
+                                        {projectMembers.map((member) => (
+                                          <option key={member.user_id} value={member.user_id}>
+                                            {member.user.full_name || member.user.email}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )
