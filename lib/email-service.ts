@@ -22,13 +22,33 @@ export interface EmailResponse {
 
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
+  private initialized: boolean = false;
 
   constructor() {
-    this.initializeTransporter();
+    // Don't initialize in constructor - do it lazily on first use
+    // This prevents issues with environment variables not being loaded yet
   }
 
-  private initializeTransporter() {
+  private ensureInitialized(): boolean {
+    if (this.initialized) {
+      return this.transporter !== null;
+    }
+
+    this.initialized = true;
+
+    // Check for required environment variables
+    const requiredVars = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'];
+    const missingVars = requiredVars.filter(v => !process.env[v]);
+
+    if (missingVars.length > 0) {
+      console.error('[EmailService] Missing required environment variables:', missingVars.join(', '));
+      console.error('[EmailService] Email sending will be disabled');
+      return false;
+    }
+
     try {
+      console.log('[EmailService] Initializing with SMTP_HOST:', process.env.SMTP_HOST);
+
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || '587'),
@@ -38,20 +58,23 @@ class EmailService {
           pass: process.env.SMTP_PASS,
         },
         tls: {
-          rejectUnauthorized: true,
+          rejectUnauthorized: false, // Allow self-signed certs for Gmail
         },
       });
 
-      // Verify connection
+      // Verify connection asynchronously (don't block)
       this.transporter.verify((error, success) => {
         if (error) {
-          console.error('Email service connection failed:', error);
+          console.error('[EmailService] SMTP connection verification failed:', error);
         } else {
-          console.log('Email service is ready to send messages');
+          console.log('[EmailService] SMTP connection verified - ready to send');
         }
       });
+
+      return true;
     } catch (error) {
-      console.error('Failed to initialize email service:', error);
+      console.error('[EmailService] Failed to initialize:', error);
+      return false;
     }
   }
 
@@ -59,16 +82,21 @@ class EmailService {
    * Send an email
    */
   async sendEmail(options: EmailOptions): Promise<EmailResponse> {
-    if (!this.transporter) {
+    // Lazy initialization
+    if (!this.ensureInitialized() || !this.transporter) {
+      console.error('[EmailService] Cannot send email - service not initialized');
       return {
         success: false,
-        error: 'Email service not initialized',
+        error: 'Email service not initialized. Check SMTP environment variables.',
       };
     }
 
     try {
+      const fromName = process.env.SMTP_FROM_NAME || 'TodolistApp';
+      const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
+
       const mailOptions = {
-        from: options.from || `"${process.env.SMTP_FROM_NAME}" <${process.env.SMTP_FROM}>`,
+        from: options.from || `"${fromName}" <${fromEmail}>`,
         to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
         subject: options.subject,
         text: options.text,
@@ -76,12 +104,19 @@ class EmailService {
         attachments: options.attachments,
       };
 
+      console.log('[EmailService] Attempting to send email:', {
+        to: options.to,
+        subject: options.subject,
+        from: mailOptions.from,
+      });
+
       const info = await this.transporter.sendMail(mailOptions);
 
-      console.log('Email sent successfully:', {
+      console.log('[EmailService] Email sent successfully:', {
         messageId: info.messageId,
         to: options.to,
         subject: options.subject,
+        response: info.response,
       });
 
       return {
@@ -89,7 +124,7 @@ class EmailService {
         messageId: info.messageId,
       };
     } catch (error) {
-      console.error('Failed to send email:', error);
+      console.error('[EmailService] Failed to send email:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -613,15 +648,16 @@ class EmailService {
    * Verify email service health
    */
   async verifyConnection(): Promise<boolean> {
-    if (!this.transporter) {
+    if (!this.ensureInitialized() || !this.transporter) {
       return false;
     }
 
     try {
       await this.transporter.verify();
+      console.log('[EmailService] Connection verified successfully');
       return true;
     } catch (error) {
-      console.error('Email verification failed:', error);
+      console.error('[EmailService] Connection verification failed:', error);
       return false;
     }
   }

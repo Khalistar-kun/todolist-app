@@ -83,16 +83,17 @@ export async function GET(request: Request) {
           data.user.user_metadata?.picture ||
           null
 
-        // Create profile with profile_completed = false for new users
+        // Use UPSERT to handle race condition with database trigger
+        // The trigger 'handle_new_user' may have already created the profile
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
-          .insert({
+          .upsert({
             id: data.user.id,
             email: data.user.email!,
             full_name: fullName,
             avatar_url: avatarUrl,
             profile_completed: false,
-          })
+          }, { onConflict: 'id' })
 
         if (profileError) {
           console.error('[Auth Callback] Error creating profile:', profileError)

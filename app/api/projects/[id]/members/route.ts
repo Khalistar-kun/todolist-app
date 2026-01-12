@@ -141,7 +141,9 @@ async function sendInvitationEmail(
   projectName: string,
   role: string,
   inviteToken: string
-) {
+): Promise<{ sent: boolean; error?: string }> {
+  console.log('[Email] Attempting to send invitation email to:', to)
+
   try {
     const result = await emailService.sendProjectInvitationEmail(
       to,
@@ -153,14 +155,15 @@ async function sendInvitationEmail(
 
     if (result.success) {
       console.log('[Email] Invitation email sent successfully to', to, 'messageId:', result.messageId)
-      return true
+      return { sent: true }
     } else {
       console.error('[Email] Failed to send invitation email:', result.error)
-      return false
+      return { sent: false, error: result.error }
     }
   } catch (error) {
-    console.error('[Email] Error sending invitation email:', error)
-    return false
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Email] Error sending invitation email:', errorMessage)
+    return { sent: false, error: errorMessage }
   }
 }
 
@@ -333,7 +336,7 @@ export async function POST(
     console.log(`[API] Created invitation for ${email} to project ${projectId}`)
 
     // Send invitation email
-    const emailSent = await sendInvitationEmail(
+    const emailResult = await sendInvitationEmail(
       email,
       inviterName,
       projectName,
@@ -348,11 +351,12 @@ export async function POST(
         role: invitation.role,
         status: invitation.status,
         expires_at: invitation.expires_at,
-        email_sent: emailSent,
+        email_sent: emailResult.sent,
+        email_error: emailResult.error,
       },
-      message: emailSent
-        ? `Invitation sent to ${email}. They will be added when they sign up or log in.`
-        : `Invitation created for ${email}. They will be added when they sign up or log in.`
+      message: emailResult.sent
+        ? `Invitation email sent to ${email}. They will be added when they sign up or log in.`
+        : `Invitation created for ${email}, but email could not be sent${emailResult.error ? `: ${emailResult.error}` : ''}. Share the invite link manually.`
     }, { status: 201 })
   } catch (error) {
     console.error('[API] Error in POST /api/projects/[id]/members:', error)

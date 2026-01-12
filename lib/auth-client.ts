@@ -12,6 +12,8 @@ export interface AuthUser {
 export async function signUp(email: string, password: string, fullName: string) {
   try {
     // Create user in auth
+    // NOTE: The database trigger 'handle_new_user' automatically creates the profile
+    // when a user is inserted into auth.users, so we do NOT manually insert into profiles
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -25,14 +27,21 @@ export async function signUp(email: string, password: string, fullName: string) 
     if (authError) throw authError
 
     if (authData.user) {
-      // Create profile record
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        email: authData.user.email!,
-        full_name: fullName,
-      })
+      // Wait briefly for the database trigger to create the profile
+      await new Promise(resolve => setTimeout(resolve, 500))
 
-      if (profileError) throw profileError
+      // Verify the profile was created by the trigger
+      const { data: profile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', authData.user.id)
+        .single()
+
+      if (profileCheckError || !profile) {
+        console.error('[SignUp] Profile trigger may have failed, profile not found:', profileCheckError)
+        // The trigger should have created the profile, but if it didn't, we have a DB issue
+        throw new Error('Database error saving new user. Please try again.')
+      }
 
       // Create default organization for new user
       const { data: orgData, error: orgError } = await supabase
@@ -45,23 +54,28 @@ export async function signUp(email: string, password: string, fullName: string) 
         .select()
         .single()
 
-      if (orgError) throw orgError
+      if (orgError) {
+        console.error('[SignUp] Error creating organization:', orgError)
+        // Don't fail signup if org creation fails, user can create one later
+      } else {
+        // Add user as owner of the organization
+        const { error: memberError } = await supabase
+          .from('organization_members')
+          .insert({
+            organization_id: orgData.id,
+            user_id: authData.user.id,
+            role: 'owner',
+          })
 
-      // Add user as owner of the organization
-      const { error: memberError } = await supabase
-        .from('organization_members')
-        .insert({
-          organization_id: orgData.id,
-          user_id: authData.user.id,
-          role: 'owner',
-        })
-
-      if (memberError) throw memberError
+        if (memberError) {
+          console.error('[SignUp] Error adding user to organization:', memberError)
+        }
+      }
     }
 
     return { success: true, data: authData }
   } catch (error: any) {
-    console.error('Sign up error:', error)
+    console.error('[SignUp] Error:', error)
     return { success: false, error: error.message }
   }
 }
@@ -131,13 +145,55 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     if (!user) return null
 
     // Get profile data
-    const { data: profile, error } = await supabase
+    let { data: profile, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single()
 
-    if (error) throw error
+    // If profile doesn't exist (trigger failed), create it now
+    if (error && error.code === 'PGRST116') {
+      console.warn('[Auth] Profile not found for user, creating fallback profile:', user.id)
+
+      const fullName = user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split('@')[0] ||
+        'User'
+
+      const avatarUrl = user.user_metadata?.avatar_url ||
+        user.user_metadata?.picture ||
+        null
+
+      // Create the missing profile
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          email: user.email!,
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          profile_completed: false,
+        }, { onConflict: 'id' })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('[Auth] Failed to create fallback profile:', createError)
+        // Return basic user info even without full profile
+        return {
+          id: user.id,
+          email: user.email!,
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          username: null,
+        }
+      }
+
+      profile = newProfile
+      console.log('[Auth] Fallback profile created successfully')
+    } else if (error) {
+      throw error
+    }
 
     return {
       id: user.id,
@@ -147,7 +203,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       username: profile.username,
     }
   } catch (error) {
-    console.error('Get current user error:', error)
+    console.error('[Auth] Get current user error:', error)
     return null
   }
 }
