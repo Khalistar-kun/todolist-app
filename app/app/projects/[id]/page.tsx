@@ -18,6 +18,7 @@ import { ReportingDashboard } from '@/components/reporting'
 import { WorkloadView } from '@/components/workload'
 import { ActivityFeed } from '@/components/activity'
 import { AISuggestions } from '@/components/ai'
+import type { TaskSuggestion } from '@/lib/services/AITaskService'
 import toast from 'react-hot-toast'
 
 type TabType = 'board' | 'timeline' | 'reports' | 'workload' | 'activity' | 'members' | 'settings'
@@ -36,6 +37,7 @@ export default function ProjectPage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false)
   const [defaultStageId, setDefaultStageId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('board')
+  const [forceReadOnly, setForceReadOnly] = useState(false)
   const [showPendingOnly, setShowPendingOnly] = useState(false)
 
   const { permissions, loading: permissionsLoading } = useProjectPermissions(projectId)
@@ -107,6 +109,14 @@ export default function ProjectPage() {
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task)
+    setForceReadOnly(false)
+    setShowTaskModal(true)
+  }
+
+  // Handler for timeline task clicks - opens in read-only view mode
+  const handleTimelineTaskClick = (task: Task) => {
+    setSelectedTask(task)
+    setForceReadOnly(true)
     setShowTaskModal(true)
   }
 
@@ -305,6 +315,7 @@ export default function ProjectPage() {
     setSelectedTask(null)
     setIsCreatingTask(false)
     setDefaultStageId(null)
+    setForceReadOnly(false)
   }
 
   const handleTaskCreated = () => {
@@ -341,6 +352,79 @@ export default function ProjectPage() {
       // Rollback on error
       setTasks(previousTasks)
       toast.error(error.message || 'Failed to delete task')
+    }
+  }
+
+  // Handler for AI Insight action clicks
+  const handleAIActionClick = async (action: TaskSuggestion['action']) => {
+    if (!action) return
+
+    switch (action.type) {
+      case 'navigate':
+        // Navigate to task or view
+        if (action.payload.task_id) {
+          // Find the task and open the modal
+          const allTasks = Object.values(tasks).flat()
+          const task = allTasks.find(t => t.id === action.payload.task_id)
+          if (task) {
+            setSelectedTask(task)
+            setForceReadOnly(false)
+            setShowTaskModal(true)
+          } else {
+            toast.error('Task not found')
+          }
+        } else if (action.payload.view === 'workload') {
+          setActiveTab('workload')
+        } else if (action.payload.filter === 'no_due_date') {
+          // Could implement filter in the future, for now switch to board
+          setActiveTab('board')
+          toast('Showing all tasks - filter for no due date not yet implemented')
+        }
+        break
+
+      case 'update_priority':
+        // Update task priority
+        if (action.payload.task_id && action.payload.new_priority) {
+          try {
+            await TaskService.updateTask(action.payload.task_id, {
+              priority: action.payload.new_priority
+            })
+            toast.success('Task priority updated')
+            fetchProjectData() // Refresh tasks
+          } catch (error: any) {
+            toast.error(error.message || 'Failed to update priority')
+          }
+        }
+        break
+
+      case 'reassign':
+        // Open task for reassignment
+        if (action.payload.task_id) {
+          const allTasks = Object.values(tasks).flat()
+          const task = allTasks.find(t => t.id === action.payload.task_id)
+          if (task) {
+            setSelectedTask(task)
+            setForceReadOnly(false)
+            setShowTaskModal(true)
+          }
+        }
+        break
+
+      case 'set_due_date':
+        // Open task for setting due date
+        if (action.payload.task_id) {
+          const allTasks = Object.values(tasks).flat()
+          const task = allTasks.find(t => t.id === action.payload.task_id)
+          if (task) {
+            setSelectedTask(task)
+            setForceReadOnly(false)
+            setShowTaskModal(true)
+          }
+        }
+        break
+
+      default:
+        console.warn('Unknown action type:', action.type)
     }
   }
 
@@ -772,7 +856,7 @@ export default function ProjectPage() {
 
             {/* AI Insights */}
             <div className="mt-6">
-              <AISuggestions projectId={projectId} />
+              <AISuggestions projectId={projectId} onActionClick={handleAIActionClick} />
             </div>
           </div>
         )}
@@ -795,7 +879,7 @@ export default function ProjectPage() {
           <TimelineView
             tasks={Object.values(tasks).flat()}
             workflowStages={project.workflow_stages || []}
-            onTaskClick={handleTaskClick}
+            onTaskClick={handleTimelineTaskClick}
           />
         )}
 
@@ -820,7 +904,7 @@ export default function ProjectPage() {
             onClose={handleModalClose}
             onUpdate={permissions.canEdit ? handleTaskUpdate : undefined}
             onCreate={isCreatingTask && permissions.canEdit ? handleTaskCreated : undefined}
-            readOnly={!permissions.canEdit}
+            readOnly={forceReadOnly || !permissions.canEdit}
             defaultStageId={defaultStageId}
           />
         )}

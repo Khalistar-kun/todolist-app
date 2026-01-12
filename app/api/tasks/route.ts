@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { project_id, title, description, stage_id, priority, due_date, tags, color } = body
+    const { project_id, title, description, stage_id, priority, due_date, tags, color, assignees } = body
 
     if (!project_id || !title) {
       return NextResponse.json(
@@ -246,6 +246,21 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[API] Created task:', task.id)
+
+    // Create task assignments if assignees were provided
+    if (assignees && Array.isArray(assignees) && assignees.length > 0) {
+      const assignmentPromises = assignees.map((assigneeId: string) =>
+        supabaseAdmin
+          .from('task_assignments')
+          .insert({
+            task_id: task.id,
+            user_id: assigneeId,
+            assigned_by: user.id,
+          })
+      )
+      await Promise.all(assignmentPromises)
+      console.log('[API] Created task assignments for:', assignees)
+    }
 
     // Send Slack notification for task creation
     sendSlackNotification(supabaseAdmin, project_id, 'create', {
@@ -544,10 +559,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
     }
 
-    // Check if user has permission to delete tasks (admin or owner only)
-    const canDelete = ['admin', 'owner'].includes(membership.role)
+    // Check if user has permission to delete tasks (member or higher)
+    const canDelete = ['member', 'admin', 'owner'].includes(membership.role)
     if (!canDelete) {
-      return NextResponse.json({ error: 'Only admins and owners can delete tasks' }, { status: 403 })
+      return NextResponse.json({ error: 'Viewers cannot delete tasks' }, { status: 403 })
     }
 
     // Store task title before deletion for Slack notification

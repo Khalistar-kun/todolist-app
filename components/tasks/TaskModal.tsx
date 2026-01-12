@@ -43,6 +43,18 @@ interface TaskFormData {
   stage_id: string
   links: TaskLink[]
   color: string | null
+  assignees: string[]
+}
+
+interface ProjectMember {
+  user_id: string
+  role: string
+  user: {
+    id: string
+    full_name: string | null
+    email: string
+    avatar_url: string | null
+  }
 }
 
 // Preset colors for task color picker - must match database constraint
@@ -79,7 +91,10 @@ export function TaskModal({
     stage_id: defaultStageId || project.workflow_stages?.[0]?.id || 'todo',
     links: [],
     color: null,
+    assignees: [],
   })
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
 
   const [newComment, setNewComment] = useState('')
   const [newSubtask, setNewSubtask] = useState('')
@@ -108,6 +123,27 @@ export function TaskModal({
 
   const isEditing = !!task
 
+  // Fetch project members when modal opens
+  useEffect(() => {
+    if (isOpen && !readOnly) {
+      const fetchMembers = async () => {
+        setMembersLoading(true)
+        try {
+          const response = await fetch(`/api/projects/${project.id}/members`)
+          const data = await response.json()
+          if (response.ok) {
+            setProjectMembers(data.members || [])
+          }
+        } catch (error) {
+          console.error('Error fetching project members:', error)
+        } finally {
+          setMembersLoading(false)
+        }
+      }
+      fetchMembers()
+    }
+  }, [isOpen, project.id, readOnly])
+
   // Load comments when switching to comments tab
   const loadComments = useCallback(async (taskId: string) => {
     setCommentsLoading(true)
@@ -134,6 +170,8 @@ export function TaskModal({
       loadTaskDetails(task.id)
       // Extract links from custom_fields
       const existingLinks = (task.custom_fields?.links as TaskLink[]) || []
+      // Get existing assignees if available
+      const existingAssignees = (task as TaskWithDetails).assignees?.map(a => a.id) || []
       setFormData({
         title: task.title,
         description: task.description || '',
@@ -143,6 +181,7 @@ export function TaskModal({
         stage_id: task.stage_id,
         links: existingLinks,
         color: task.color || null,
+        assignees: existingAssignees,
       })
     } else {
       // Reset form for new task
@@ -155,6 +194,7 @@ export function TaskModal({
         stage_id: defaultStageId || project.workflow_stages?.[0]?.id || 'todo',
         links: [],
         color: null,
+        assignees: [],
       })
       setTaskDetails(null)
     }
@@ -175,7 +215,7 @@ export function TaskModal({
 
     try {
       // Prepare data with links stored in custom_fields
-      const { links, color, ...restFormData } = formData
+      const { links, color, assignees, ...restFormData } = formData
       const taskData = {
         ...restFormData,
         color: color, // Include color in task data
@@ -188,13 +228,18 @@ export function TaskModal({
       if (isEditing && task) {
         // Update existing task
         const updatedTask = await TaskService.updateTask(task.id, taskData)
+        // Update assignees separately if changed
+        if (assignees.length > 0 || (task as TaskWithDetails).assignees?.length > 0) {
+          await TaskService.assignTask(task.id, assignees)
+        }
         onUpdate?.(updatedTask)
         toast.success('Task updated successfully')
       } else {
-        // Create new task
+        // Create new task with assignees
         await TaskService.createTask({
           ...taskData,
           project_id: project.id,
+          assignees: assignees.length > 0 ? assignees : undefined,
         })
         onCreate?.()
         toast.success('Task created successfully')
@@ -430,6 +475,98 @@ export function TaskModal({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Assignees */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Assignees
+                  </label>
+                  {membersLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
+                      Loading members...
+                    </div>
+                  ) : !readOnly ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {projectMembers.map((member) => {
+                          const isSelected = formData.assignees.includes(member.user_id)
+                          return (
+                            <button
+                              key={member.user_id}
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  setFormData({
+                                    ...formData,
+                                    assignees: formData.assignees.filter(id => id !== member.user_id)
+                                  })
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    assignees: [...formData.assignees, member.user_id]
+                                  })
+                                }
+                              }}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all ${
+                                isSelected
+                                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                              }`}
+                            >
+                              {member.user.avatar_url ? (
+                                <img
+                                  src={member.user.avatar_url}
+                                  alt={member.user.full_name || member.user.email}
+                                  className="w-5 h-5 rounded-full"
+                                />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                  <span className="text-xs text-white font-medium">
+                                    {(member.user.full_name || member.user.email)[0].toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              <span className="truncate max-w-[120px]">
+                                {member.user.full_name || member.user.email}
+                              </span>
+                              {isSelected && (
+                                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {projectMembers.length === 0 && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No team members found</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.assignees.length > 0 ? (
+                        formData.assignees.map(userId => {
+                          const member = projectMembers.find(m => m.user_id === userId)
+                          return member ? (
+                            <span key={userId} className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                              {member.user.avatar_url ? (
+                                <img src={member.user.avatar_url} alt={member.user.full_name || ''} className="w-5 h-5 rounded-full" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                  <span className="text-xs text-white">{(member.user.full_name || member.user.email)[0].toUpperCase()}</span>
+                                </div>
+                              )}
+                              {member.user.full_name || member.user.email}
+                            </span>
+                          ) : null
+                        })
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No assignees</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Color Label */}
