@@ -226,8 +226,9 @@ export function TaskCard({
       ref={setNodeRef}
       style={style}
       data-task-card="true"
-      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group overflow-hidden ${
-        isDragging ? 'opacity-50 rotate-3' : ''
+      data-sortable="true"
+      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group overflow-hidden touch-none sm:touch-auto ${
+        isDragging ? 'opacity-50 scale-95' : ''
       } ${
         isSelected
           ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-500/30 dark:ring-blue-400/30 bg-blue-50/50 dark:bg-blue-900/20'

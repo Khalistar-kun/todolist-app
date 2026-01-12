@@ -380,3 +380,50 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     padding-right: max(0px, env(safe-area-inset-right));
   }
 }
+
+/* ============================================================================
+   MOBILE DRAG & DROP STYLES
+   ============================================================================ */
+
+/* Dragging state - card being actively dragged */
+[data-dragging="true"] {
+  @apply opacity-50 scale-95 transition-transform;
+}
+
+/* Long-press pending indicator - subtle pulse during delay */
+@keyframes longPressPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+  50% { transform: scale(1.01); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+}
+
+.long-press-pending {
+  animation: longPressPulse 0.8s ease-in-out infinite;
+}
+
+/* Active drag state - lifted appearance */
+.long-press-active {
+  @apply scale-105 shadow-2xl ring-2 ring-blue-500/50;
+  z-index: 50;
+}
+
+/* Prevent body scroll when dragging on mobile */
+body.drag-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  touch-action: none !important;
+}
+
+/* Mobile-specific drag overlay styling */
+@media (max-width: 640px) {
+  /* Larger touch targets on mobile for drag handles */
+  [data-sortable] {
+    touch-action: manipulation;
+  }
+
+  /* Prevent accidental text selection during drag */
+  [data-sortable] * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}

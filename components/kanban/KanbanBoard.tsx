@@ -6,7 +6,8 @@ import {
   DragOverlay,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  TouchSensor,
+  MouseSensor,
   useSensor,
   useSensors,
   DragStartEvent,
@@ -15,6 +16,7 @@ import {
   DragCancelEvent,
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { lockBodyScroll, unlockBodyScroll, isTouchDevice } from '@/hooks/useLongPressSensor'
 import type { Project, Task } from '@/lib/supabase'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCard } from '../tasks/TaskCard'
@@ -313,19 +315,27 @@ export function KanbanBoard({
     }
   }, [isDraggingScroll])
 
-  // DND sensors - balanced for both mobile scrolling and drag
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        // Use distance instead of delay for better mobile UX
-        // Allows scrolling but activates drag with small movement
-        distance: 10, // 10px movement to activate drag
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
+  // DND sensors - optimized for both mobile and desktop
+  // Mobile: Long-press (400ms delay) to activate drag, allows scrolling
+  // Desktop: 10px movement to activate drag
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 400, // 400ms long-press to activate
+      tolerance: 5, // 5px tolerance - if moved more, cancel (user is scrolling)
+    },
+  })
+
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 10, // 10px movement to activate drag on desktop
+    },
+  })
+
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  })
+
+  const sensors = useSensors(touchSensor, mouseSensor, keyboardSensor)
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
@@ -334,6 +344,14 @@ export function KanbanBoard({
       .find((t) => t.id === active.id)
 
     setActiveTask(task || null)
+
+    // Lock body scroll during drag (especially important for mobile)
+    lockBodyScroll()
+
+    // Haptic feedback on mobile
+    if (isTouchDevice() && 'vibrate' in navigator) {
+      navigator.vibrate(50)
+    }
   }
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -364,6 +382,7 @@ export function KanbanBoard({
     const { active, over } = event
 
     setActiveTask(null)
+    unlockBodyScroll()
 
     if (!over) return
 
@@ -442,6 +461,7 @@ export function KanbanBoard({
 
   const handleDragCancel = () => {
     setActiveTask(null)
+    unlockBodyScroll()
   }
 
   return (
@@ -544,9 +564,9 @@ export function KanbanBoard({
           ))}
         </div>
 
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeTask ? (
-            <div className="transform rotate-3 opacity-90">
+            <div className="transform scale-105 opacity-95 shadow-2xl ring-2 ring-blue-500/50 rounded-lg">
               <TaskCard
                 task={activeTask}
                 onClick={() => {}}
@@ -560,7 +580,8 @@ export function KanbanBoard({
       {/* Helper text */}
       {selectedTaskIds.size === 0 && (
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-4 text-center">
-          Tip: Hold Ctrl and click to select multiple tasks
+          <span className="hidden sm:inline">Tip: Hold Ctrl and click to select multiple tasks</span>
+          <span className="sm:hidden">Tip: Long-press a task to drag and move it</span>
         </p>
       )}
 
