@@ -522,27 +522,27 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          type: 'task_assigned' | 'task_updated' | 'comment_added' | 'project_invite' | 'deadline_reminder'
+          type: string // Changed from enum to TEXT in migration 009
           title: string
           message: string
           data: Record<string, any>
-          read: boolean
+          is_read: boolean // Renamed from 'read' to 'is_read' in migration 009
           created_at: string
         }
         Insert: {
           user_id: string
-          type: 'task_assigned' | 'task_updated' | 'comment_added' | 'project_invite' | 'deadline_reminder'
+          type: string
           title: string
           message: string
           data?: Record<string, any>
-          read?: boolean
+          is_read?: boolean
         }
         Update: {
-          type?: 'task_assigned' | 'task_updated' | 'comment_added' | 'project_invite' | 'deadline_reminder'
+          type?: string
           title?: string
           message?: string
           data?: Record<string, any>
-          read?: boolean
+          is_read?: boolean
         }
       }
     }
