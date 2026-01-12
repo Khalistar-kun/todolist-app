@@ -186,6 +186,10 @@ export type Database = {
           position: number
           stage_id: string
           due_date: string | null
+          start_date: string | null
+          estimated_hours: number | null
+          parent_task_id: string | null
+          milestone_id: string | null
           completed_at: string | null
           created_by: string | null
           updated_by: string | null
@@ -211,6 +215,10 @@ export type Database = {
           position?: number
           stage_id?: string
           due_date?: string | null
+          start_date?: string | null
+          estimated_hours?: number | null
+          parent_task_id?: string | null
+          milestone_id?: string | null
           created_by?: string | null
           tags?: string[]
           custom_fields?: Record<string, any>
@@ -224,6 +232,10 @@ export type Database = {
           position?: number
           stage_id?: string
           due_date?: string | null
+          start_date?: string | null
+          estimated_hours?: number | null
+          parent_task_id?: string | null
+          milestone_id?: string | null
           completed_at?: string | null
           updated_by?: string | null
           tags?: string[]
