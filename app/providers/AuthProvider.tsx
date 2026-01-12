@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/auth-client'
 
@@ -30,13 +30,195 @@ interface AuthContextType extends AuthState {
 }
 
 // ============================================================================
+// SINGLETON AUTH STORE (survives React re-renders and soft refresh)
+// ============================================================================
+
+type Listener = () => void
+
+class AuthStore {
+  private state: AuthState = {
+    status: 'loading',
+    user: null,
+    accessToken: null,
+  }
+  private listeners = new Set<Listener>()
+  private initialized = false
+  private initPromise: Promise<void> | null = null
+
+  getState = (): AuthState => {
+    return this.state
+  }
+
+  subscribe = (listener: Listener): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private setState(newState: AuthState) {
+    this.state = newState
+    this.listeners.forEach(listener => listener())
+  }
+
+  async initialize(): Promise<void> {
+    // If already initialized and authenticated, don't re-init
+    // This handles soft refresh where JS context persists
+    if (this.initialized && this.state.status !== 'loading') {
+      console.log('[Auth] Already initialized, status:', this.state.status)
+      return
+    }
+
+    // If init is in progress, wait for it
+    if (this.initPromise) {
+      return this.initPromise
+    }
+
+    this.initPromise = this.doInitialize()
+    await this.initPromise
+    this.initPromise = null
+  }
+
+  private async doInitialize(): Promise<void> {
+    console.log('[Auth] Initializing...')
+    this.setState({ status: 'loading', user: null, accessToken: null })
+
+    try {
+      // STEP 1: Check for local session
+      const { data: sessionData } = await supabase.auth.getSession()
+
+      if (!sessionData?.session) {
+        console.log('[Auth] No session found')
+        this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+        this.initialized = true
+        return
+      }
+
+      // STEP 2: Validate session with server
+      console.log('[Auth] Session found, validating...')
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+
+      if (userError || !userData?.user) {
+        console.warn('[Auth] Session invalid:', userError?.message)
+        this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+        this.initialized = true
+        return
+      }
+
+      // STEP 3: Set authenticated state
+      const authUser: AuthUser = {
+        id: userData.user.id,
+        email: userData.user.email || '',
+        full_name: userData.user.user_metadata?.full_name || null,
+        avatar_url: userData.user.user_metadata?.avatar_url || null,
+        username: null,
+      }
+
+      console.log('[Auth] Session validated - authenticated')
+      this.setState({
+        status: 'authenticated',
+        user: authUser,
+        accessToken: sessionData.session.access_token,
+      })
+      this.initialized = true
+
+      // STEP 4: Load full profile in background
+      try {
+        const fullProfile = await getCurrentUser()
+        if (fullProfile && this.state.status === 'authenticated') {
+          this.setState({
+            ...this.state,
+            user: fullProfile,
+          })
+          console.log('[Auth] Full profile loaded')
+        }
+      } catch (profileError) {
+        console.error('[Auth] Profile fetch error:', profileError)
+      }
+    } catch (error) {
+      console.error('[Auth] Critical init error:', error)
+      this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+      this.initialized = true
+    }
+  }
+
+  async signOut(): Promise<void> {
+    // Clear storage
+    try {
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && (key.startsWith('profile-') || key.startsWith('notifications-') || key.startsWith('welcome-seen-'))) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key))
+    } catch (e) {
+      console.error('[Auth] Error clearing localStorage:', e)
+    }
+
+    // Update state immediately
+    this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+
+    try {
+      const channels = supabase.getChannels()
+      await Promise.all(channels.map(channel => supabase.removeChannel(channel)))
+      await supabase.auth.signOut({ scope: 'global' })
+    } catch (err) {
+      console.error('[Auth] Error during signOut:', err)
+    }
+  }
+
+  async refreshUser(): Promise<void> {
+    if (this.state.status !== 'authenticated') return
+
+    try {
+      const profile = await getCurrentUser()
+      if (profile) {
+        this.setState({ ...this.state, user: profile })
+      }
+    } catch (error) {
+      console.error('[Auth] Error refreshing user:', error)
+    }
+  }
+
+  // Handle auth state changes from Supabase
+  handleAuthChange(event: string, session: any) {
+    console.log('[Auth] State change:', event)
+
+    if (event === 'SIGNED_OUT') {
+      this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+      return
+    }
+
+    if (event === 'SIGNED_IN' && session?.user) {
+      // Re-initialize to get fresh state
+      this.initialized = false
+      this.initialize()
+    }
+
+    if (event === 'TOKEN_REFRESHED' && session?.access_token) {
+      this.setState({ ...this.state, accessToken: session.access_token })
+    }
+  }
+
+  // Force re-initialization (for testing/debugging)
+  reset() {
+    this.initialized = false
+    this.initPromise = null
+    this.setState({ status: 'loading', user: null, accessToken: null })
+  }
+}
+
+// Global singleton instance
+const authStore = new AuthStore()
+
+// ============================================================================
 // CONTEXT
 // ============================================================================
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // ============================================================================
-// GLOBAL SKELETON (blocks app until auth resolves)
+// GLOBAL SKELETON
 // ============================================================================
 
 function GlobalSkeleton() {
@@ -51,242 +233,40 @@ function GlobalSkeleton() {
 }
 
 // ============================================================================
-// STORAGE HELPERS
-// ============================================================================
-
-function clearUserStorage() {
-  try {
-    const keysToRemove: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key) {
-        if (
-          key.startsWith('profile-') ||
-          key.startsWith('notifications-') ||
-          key.startsWith('welcome-seen-')
-        ) {
-          keysToRemove.push(key)
-        }
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key))
-  } catch (e) {
-    console.error('[Auth] Error clearing localStorage:', e)
-  }
-}
-
-// ============================================================================
 // AUTH PROVIDER
 // ============================================================================
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Single authoritative state
-  const [state, setState] = useState<AuthState>({
-    status: 'loading',
-    user: null,
-    accessToken: null,
-  })
+  // Use useSyncExternalStore for proper subscription to singleton store
+  const state = useSyncExternalStore(
+    authStore.subscribe,
+    authStore.getState,
+    authStore.getState // Server snapshot (same as client for this use case)
+  )
 
-  // Ref to track if component is still mounted (for async operations)
-  const isMountedRef = useRef(true)
-
-  // -------------------------------------------------------------------------
-  // SIGN OUT
-  // -------------------------------------------------------------------------
-  const signOut = useCallback(async () => {
-    clearUserStorage()
-
-    // Update state IMMEDIATELY before async work
-    setState({ status: 'unauthenticated', user: null, accessToken: null })
-
-    try {
-      // Clean up realtime channels
-      const channels = supabase.getChannels()
-      await Promise.all(channels.map(channel => supabase.removeChannel(channel)))
-
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
-      if (error) {
-        console.error('[Auth] Supabase signOut error:', error)
-      }
-    } catch (err) {
-      console.error('[Auth] Error during signOut:', err)
-    }
-  }, [])
-
-  // -------------------------------------------------------------------------
-  // REFRESH USER (for profile updates)
-  // -------------------------------------------------------------------------
-  const refreshUser = useCallback(async () => {
-    if (!isMountedRef.current) return
-
-    try {
-      const profile = await getCurrentUser()
-      if (isMountedRef.current && profile) {
-        setState(prev => ({
-          ...prev,
-          user: profile,
-        }))
-      }
-    } catch (error) {
-      console.error('[Auth] Error refreshing user:', error)
-    }
-  }, [])
-
-  // -------------------------------------------------------------------------
-  // INITIALIZATION (runs on every mount)
-  // -------------------------------------------------------------------------
+  // Initialize on mount
   useEffect(() => {
-    // CRITICAL: Reset state to loading on mount
-    // On soft refresh, React may preserve state but we need fresh auth check
-    setState({ status: 'loading', user: null, accessToken: null })
-    isMountedRef.current = true
+    authStore.initialize()
 
-    // Local flag for double-call protection within this effect execution
-    let initStarted = false
-
-    async function init() {
-      if (initStarted) return
-      initStarted = true
-
-      console.log('[Auth] Initializing...')
-
-      try {
-        // STEP 1: Check for local session
-        const { data: sessionData } = await supabase.auth.getSession()
-
-        if (!sessionData?.session) {
-          // No session = unauthenticated
-          console.log('[Auth] No session found')
-          if (isMountedRef.current) {
-            setState({ status: 'unauthenticated', user: null, accessToken: null })
-          }
-          return
-        }
-
-        // STEP 2: Validate session with server (CRITICAL for soft refresh)
-        console.log('[Auth] Session found, validating with server...')
-        const { data: userData, error: userError } = await supabase.auth.getUser()
-
-        if (!isMountedRef.current) return
-
-        if (userError || !userData?.user) {
-          console.warn('[Auth] Session invalid:', userError?.message)
-          setState({ status: 'unauthenticated', user: null, accessToken: null })
-          return
-        }
-
-        // STEP 3: Session is valid - set authenticated state
-        const authUser: AuthUser = {
-          id: userData.user.id,
-          email: userData.user.email || '',
-          full_name: userData.user.user_metadata?.full_name || null,
-          avatar_url: userData.user.user_metadata?.avatar_url || null,
-          username: null,
-        }
-
-        console.log('[Auth] Session validated - authenticated')
-        setState({
-          status: 'authenticated',
-          user: authUser,
-          accessToken: sessionData.session.access_token,
-        })
-
-        // STEP 4: Load full profile in background (non-blocking)
-        try {
-          const fullProfile = await getCurrentUser()
-          if (fullProfile && isMountedRef.current) {
-            setState(prev => ({
-              ...prev,
-              user: fullProfile,
-            }))
-            console.log('[Auth] Full profile loaded')
-          }
-        } catch (profileError) {
-          console.error('[Auth] Profile fetch error:', profileError)
-          // Keep basic user - auth is still valid
-        }
-      } catch (error) {
-        console.error('[Auth] Critical init error:', error)
-        if (isMountedRef.current) {
-          setState({ status: 'unauthenticated', user: null, accessToken: null })
-        }
-      }
-    }
-
-    init()
-
-    // Set up auth state change listener (for other tabs, token refresh)
+    // Set up Supabase auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[Auth] State change:', event)
-
-        if (!isMountedRef.current) return
-
-        if (event === 'SIGNED_OUT') {
-          setState({ status: 'unauthenticated', user: null, accessToken: null })
-          clearUserStorage()
-          return
-        }
-
-        if (event === 'TOKEN_REFRESHED' && !session) {
-          console.warn('[Auth] Token refresh failed')
-          setState({ status: 'unauthenticated', user: null, accessToken: null })
-          return
-        }
-
-        if (session?.user) {
-          try {
-            const profile = await getCurrentUser()
-            if (profile && isMountedRef.current) {
-              setState({
-                status: 'authenticated',
-                user: profile,
-                accessToken: session.access_token,
-              })
-            }
-          } catch (error) {
-            console.error('[Auth] Profile fetch error:', error)
-            // Use basic info from session
-            setState({
-              status: 'authenticated',
-              user: {
-                id: session.user.id,
-                email: session.user.email || '',
-                full_name: session.user.user_metadata?.full_name || null,
-                avatar_url: session.user.user_metadata?.avatar_url || null,
-                username: null,
-              },
-              accessToken: session.access_token,
-            })
-          }
-        }
-      }
+      (event, session) => authStore.handleAuthChange(event, session)
     )
 
     return () => {
-      isMountedRef.current = false
       subscription.unsubscribe()
     }
   }, [])
 
-  // -------------------------------------------------------------------------
-  // BFCACHE HANDLER (Safari back-forward cache)
-  // -------------------------------------------------------------------------
+  // Handle bfcache restoration
   useEffect(() => {
     const handlePageShow = async (event: PageTransitionEvent) => {
       if (!event.persisted) return
+      console.log('[Auth] bfcache restore')
 
-      console.log('[Auth] bfcache restore - validating session')
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session && state.status === 'authenticated') {
-          console.log('[Auth] Session expired during bfcache')
-          setState({ status: 'unauthenticated', user: null, accessToken: null })
-        }
-      } catch (error) {
-        console.error('[Auth] bfcache session check error:', error)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session && state.status === 'authenticated') {
+        authStore.handleAuthChange('SIGNED_OUT', null)
       }
     }
 
@@ -294,16 +274,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('pageshow', handlePageShow)
   }, [state.status])
 
-  // -------------------------------------------------------------------------
-  // RENDER
-  // -------------------------------------------------------------------------
+  // Create stable callbacks
+  const signOut = useCallback(() => authStore.signOut(), [])
+  const refreshUser = useCallback(() => authStore.refreshUser(), [])
+
   const value: AuthContextType = {
     ...state,
     signOut,
     refreshUser,
   }
 
-  // CRITICAL: Block ALL rendering until auth is resolved
+  // Block rendering until auth resolves
   if (state.status === 'loading') {
     return (
       <AuthContext.Provider value={value}>
@@ -327,7 +308,6 @@ export function useAuth() {
   return context
 }
 
-// Legacy compatibility - expose loading as a separate boolean
 export function useAuthLoading() {
   const { status } = useAuth()
   return status === 'loading'

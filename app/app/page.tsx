@@ -91,7 +91,9 @@ export default function Dashboard() {
   })
   const [recentTasks, setRecentTasks] = useState<RecentTask[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [dataLoading, setDataLoading] = useState(true)
+  // Start as false - we'll set to true only when we need to fetch
+  const [dataLoading, setDataLoading] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const isInitialLoadRef = useRef(true)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -246,64 +248,59 @@ export default function Dashboard() {
   }, [user])
 
   // Effect to fetch data when user authenticates
+  // Uses dataLoaded flag to ensure we only fetch once per mount
   useEffect(() => {
-    // Clear any existing timeout
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current)
-    }
-
-    // Handle unauthenticated state
-    if (status === 'unauthenticated') {
-      setDataLoading(false)
+    // Skip if already loaded or loading
+    if (dataLoaded || dataLoading) {
       return
     }
 
-    // Only fetch when authenticated with a user
+    // Skip if not authenticated
     if (status !== 'authenticated' || !user) {
       return
     }
 
-    // Start fresh data load
+    // Start loading
     setDataLoading(true)
     console.log('[Dashboard] Initiating data fetch for user:', user.id)
 
     // Set a timeout to prevent infinite loading
-    loadingTimeoutRef.current = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       console.warn('[Dashboard] Data loading timed out')
       setLoadError('Loading is taking longer than expected. Please refresh the page.')
       setDataLoading(false)
     }, DATA_LOADING_TIMEOUT_MS)
 
-    fetchDashboardData().then(() => {
-      isInitialLoadRef.current = false
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current)
-      }
-    }).catch((error) => {
-      console.error('[Dashboard] Data fetch error:', error)
-      setDataLoading(false)
-    })
+    fetchDashboardData()
+      .then(() => {
+        setDataLoaded(true)
+        isInitialLoadRef.current = false
+      })
+      .catch((error) => {
+        console.error('[Dashboard] Data fetch error:', error)
+      })
+      .finally(() => {
+        clearTimeout(timeoutId)
+      })
 
     return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current)
-      }
+      clearTimeout(timeoutId)
     }
-  }, [user?.id, status, fetchDashboardData])
+  }, [user?.id, status, fetchDashboardData, dataLoaded, dataLoading])
 
   // CRITICAL ORDER OF CHECKS:
-  // 1. Auth not initialized → show skeleton (blocks ALL rendering until auth resolves)
-  // 2. Data loading (when authenticated) → show skeleton
-  // 3. Unauthenticated → show login prompt (only after auth is resolved)
-  // 4. Authenticated with data → show dashboard
+  // 1. Auth loading → skeleton
+  // 2. Authenticated but data not loaded → skeleton (triggers fetch)
+  // 3. Unauthenticated → login prompt
+  // 4. Authenticated with data → dashboard
 
-  // Check 1: Auth is not yet initialized - show skeleton, never any auth-dependent UI
+  // Check 1: Auth still loading
   if (status === 'loading') {
     return <DashboardSkeleton />
   }
 
-  // Check 2: Auth resolved, still loading data - show skeleton
-  if (status === 'authenticated' && dataLoading) {
+  // Check 2: Authenticated but data not yet loaded
+  if (status === 'authenticated' && !dataLoaded) {
     return <DashboardSkeleton />
   }
 
