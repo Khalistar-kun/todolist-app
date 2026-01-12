@@ -225,6 +225,7 @@ export function TaskCard({
     <div
       ref={setNodeRef}
       style={style}
+      data-task-card="true"
       className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group overflow-hidden ${
         isDragging ? 'opacity-50 rotate-3' : ''
       } ${

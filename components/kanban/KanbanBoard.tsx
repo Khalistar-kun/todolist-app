@@ -252,6 +252,67 @@ export function KanbanBoard({
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  // Mouse drag scrolling state for grab-and-pan
+  const [isDraggingScroll, setIsDraggingScroll] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+
+  // Handle mouse down for drag scrolling
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Only trigger on direct container clicks (not on cards or buttons)
+    const target = e.target as HTMLElement
+    const isClickOnCard = target.closest('[data-task-card]') ||
+                          target.closest('button') ||
+                          target.closest('[data-sortable]') ||
+                          target.closest('[role="button"]')
+
+    if (isClickOnCard) return
+
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    setIsDraggingScroll(true)
+    setStartX(e.pageX - container.offsetLeft)
+    setScrollLeft(container.scrollLeft)
+    container.style.cursor = 'grabbing'
+    container.style.userSelect = 'none'
+  }, [])
+
+  // Handle mouse move for drag scrolling
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingScroll) return
+
+    e.preventDefault()
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const x = e.pageX - container.offsetLeft
+    const walk = (x - startX) * 1.5 // Scroll speed multiplier
+    container.scrollLeft = scrollLeft - walk
+  }, [isDraggingScroll, startX, scrollLeft])
+
+  // Handle mouse up to stop drag scrolling
+  const handleMouseUp = useCallback(() => {
+    setIsDraggingScroll(false)
+    const container = scrollContainerRef.current
+    if (container) {
+      container.style.cursor = 'grab'
+      container.style.userSelect = ''
+    }
+  }, [])
+
+  // Handle mouse leave to stop drag scrolling
+  const handleMouseLeave = useCallback(() => {
+    if (isDraggingScroll) {
+      setIsDraggingScroll(false)
+      const container = scrollContainerRef.current
+      if (container) {
+        container.style.cursor = 'grab'
+        container.style.userSelect = ''
+      }
+    }
+  }, [isDraggingScroll])
+
   // DND sensors - balanced for both mobile scrolling and drag
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -450,8 +511,12 @@ export function KanbanBoard({
       >
         <div
           ref={scrollContainerRef}
-          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto overflow-y-hidden pb-4 px-1 -mx-1 snap-x snap-proximity sm:snap-none scroll-smooth touch-scroll tap-highlight-none"
+          className="flex space-x-4 sm:space-x-6 h-full overflow-x-auto overflow-y-hidden pb-4 px-1 -mx-1 snap-x snap-proximity sm:snap-none scroll-smooth touch-scroll tap-highlight-none cursor-grab active:cursor-grabbing"
           style={{ WebkitOverflowScrolling: 'touch' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
         >
           {workflowStages.map((stage) => (
             <KanbanColumn
