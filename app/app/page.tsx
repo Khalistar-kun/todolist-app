@@ -99,14 +99,19 @@ export default function Dashboard() {
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastDataRefreshRef = useRef<number>(0)
 
+  // Store user in ref for stable access in callbacks
+  const userRef = useRef(user)
+  userRef.current = user
+
   // Silent refetch for real-time updates - uses same parallel pattern
   const refetchDataSilently = useCallback(async () => {
-    if (!user) return
+    const currentUser = userRef.current
+    if (!currentUser) return
     try {
       const { data: projectMembers } = await supabase
         .from('project_members')
         .select('project_id')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
 
       const projectIds = projectMembers?.map(pm => pm.project_id) || []
       if (projectIds.length === 0) return
@@ -143,7 +148,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error refetching dashboard data:', error)
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Stable callback - uses userRef for user access
 
   // Subscribe to real-time updates
   useRealtimeSubscription({
@@ -173,16 +179,17 @@ export default function Dashboard() {
 
     window.addEventListener('pageshow', handlePageShow)
     return () => window.removeEventListener('pageshow', handlePageShow)
-  }, [user, refetchDataSilently])
+  }, [refetchDataSilently])
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user) return
+    const currentUser = userRef.current
+    if (!currentUser) return
     try {
       // First get user's project IDs
       const { data: projectMembers, error: memberError } = await supabase
         .from('project_members')
         .select('project_id')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
 
       if (memberError) {
         console.error('Error fetching project members:', memberError)
@@ -245,7 +252,8 @@ export default function Dashboard() {
     } finally {
       setDataLoading(false)
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Stable callback - uses userRef for user access
 
   // Effect to fetch data when user authenticates
   // Uses dataLoaded flag to ensure we only fetch once per mount

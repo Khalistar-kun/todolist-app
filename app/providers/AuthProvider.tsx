@@ -181,22 +181,39 @@ class AuthStore {
   }
 
   // Handle auth state changes from Supabase
+  // IMPORTANT: Only handle actual state changes, not tab visibility events
   handleAuthChange(event: string, session: any) {
+    // Ignore INITIAL_SESSION - we handle initialization ourselves
+    if (event === 'INITIAL_SESSION') {
+      return
+    }
+
     console.log('[Auth] State change:', event)
 
     if (event === 'SIGNED_OUT') {
-      this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+      // Only update if we think we're authenticated
+      if (this.state.status === 'authenticated') {
+        this.initialized = false
+        this.setState({ status: 'unauthenticated', user: null, accessToken: null })
+      }
       return
     }
 
     if (event === 'SIGNED_IN' && session?.user) {
-      // Re-initialize to get fresh state
-      this.initialized = false
-      this.initialize()
+      // Only re-init if we're not already authenticated as this user
+      if (this.state.status !== 'authenticated' || this.state.user?.id !== session.user.id) {
+        this.initialized = false
+        this.initialize()
+      }
+      return
     }
 
     if (event === 'TOKEN_REFRESHED' && session?.access_token) {
-      this.setState({ ...this.state, accessToken: session.access_token })
+      // Just update the token, don't trigger re-render cascade
+      if (this.state.accessToken !== session.access_token) {
+        this.state = { ...this.state, accessToken: session.access_token }
+        // Don't notify listeners for just a token update - it's not user-facing
+      }
     }
   }
 
