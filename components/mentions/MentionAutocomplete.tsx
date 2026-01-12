@@ -107,16 +107,22 @@ export function MentionAutocomplete({
     <div
       ref={listRef}
       data-mention-dropdown="true"
+      data-radix-focus-guard=""
       style={{
         position: 'fixed',
         top: position.top,
         left: position.left,
         zIndex: 99999,
+        pointerEvents: 'auto',
       }}
       className="w-64 max-h-80 overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700"
       onMouseDown={(e) => {
         // CRITICAL: Prevent blur on input and stop propagation to parent handlers
         e.preventDefault()
+        e.stopPropagation()
+      }}
+      onPointerDown={(e) => {
+        // Also prevent pointer events from bubbling (for Radix Dialog compatibility)
         e.stopPropagation()
       }}
       onClick={(e) => {
@@ -139,6 +145,7 @@ export function MentionAutocomplete({
             <button
               key={user.id}
               data-index={index}
+              type="button"
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -146,6 +153,11 @@ export function MentionAutocomplete({
               }}
               onMouseDown={(e) => {
                 // Prevent blur and any parent mousedown handlers
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              onPointerDown={(e) => {
+                // Prevent Radix Dialog focus trapping interference
                 e.preventDefault()
                 e.stopPropagation()
               }}
