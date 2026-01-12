@@ -504,7 +504,7 @@ export default function Dashboard() {
                 recentTasks.slice(0, 5).map((task, index) => (
                   <Link
                     key={task.id}
-                    href={`/app/projects/${task.project_id}/tasks/${task.id}`}
+                    href={`/app/projects/${task.project_id}`}
                     onClick={playClick}
                     className="list-item hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 press-scale"
                     style={{ animationDelay: `${index * 50}ms` }}
