@@ -1,6 +1,18 @@
+import { Suspense } from 'react'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { SignInForm } from '@/components/auth/SignInForm'
 import Link from 'next/link'
+
+// Loading fallback for SignInForm (uses useSearchParams which requires Suspense)
+function SignInFormFallback() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+    </div>
+  )
+}
 
 export default function SignInPage() {
   return (
@@ -9,7 +21,9 @@ export default function SignInPage() {
         title="Sign in to your account"
         subtitle="Welcome back! Please enter your details."
       >
-        <SignInForm />
+        <Suspense fallback={<SignInFormFallback />}>
+          <SignInForm />
+        </Suspense>
       </AuthLayout>
 
       {/* Back to home link */}

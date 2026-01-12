@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Project, Task } from '@/lib/supabase'
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
+import { usePageVisibility } from '@/hooks/usePageVisibility'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { useSound } from '@/hooks/useSound'
@@ -81,7 +82,7 @@ function DashboardSkeleton() {
 
 export default function Dashboard() {
   // CRITICAL: Use status as primary auth indicator, not loading boolean
-  const { user, status } = useAuth()
+  const { user, status, forceRefresh } = useAuth()
   const { playClick } = useSound()
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -95,6 +96,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const isInitialLoadRef = useRef(true)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastDataRefreshRef = useRef<number>(0)
 
   // Silent refetch for real-time updates - uses same parallel pattern
   const refetchDataSilently = useCallback(async () => {
@@ -155,6 +157,27 @@ export default function Dashboard() {
       }
     },
     enabled: !!user,
+  })
+
+  // Handle page visibility - refresh data when tab becomes visible or page restored from bfcache
+  // This is CRITICAL for macOS/iOS where bfcache causes stale data
+  usePageVisibility({
+    onVisible: () => {
+      const now = Date.now()
+      // Debounce - only refresh if more than 5 seconds since last refresh
+      if (user && now - lastDataRefreshRef.current > 5000) {
+        console.log('[Dashboard] Page visible - refreshing data')
+        lastDataRefreshRef.current = now
+        refetchDataSilently()
+      }
+    },
+    onPageShow: (persisted) => {
+      if (persisted && user) {
+        console.log('[Dashboard] Page restored from bfcache - refreshing data')
+        lastDataRefreshRef.current = Date.now()
+        refetchDataSilently()
+      }
+    },
   })
 
   const fetchDashboardData = useCallback(async () => {

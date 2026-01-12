@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn, signInWithGoogle } from '@/lib/auth-client'
 import toast from 'react-hot-toast'
 
@@ -10,7 +10,18 @@ export function SignInForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [inviteToken, setInviteToken] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Check for invite token in URL
+  useEffect(() => {
+    const invite = searchParams.get('invite')
+    if (invite) {
+      setInviteToken(invite)
+      console.log('[SignIn] Invite token detected:', invite)
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,10 +35,38 @@ export function SignInForm() {
 
       if (result.success) {
         toast.success('Successfully signed in!')
-        console.log('[SignIn] Success! Redirecting to /app...')
+        console.log('[SignIn] Success! Redirecting...')
         // Small delay to ensure cookies are set
         await new Promise(resolve => setTimeout(resolve, 500))
         console.log('[SignIn] Cookies before redirect:', document.cookie)
+
+        // If there's an invite token, accept it after login
+        if (inviteToken) {
+          try {
+            console.log('[SignIn] Accepting invitation with token:', inviteToken)
+            const inviteResponse = await fetch('/api/invitations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: inviteToken, action: 'accept' }),
+            })
+            const inviteResult = await inviteResponse.json()
+            if (inviteResponse.ok) {
+              toast.success(inviteResult.message || 'Invitation accepted!')
+              console.log('[SignIn] Invitation accepted, redirecting to project')
+              // Redirect to the project if we have the ID
+              if (inviteResult.project_id) {
+                window.location.href = `/app/projects/${inviteResult.project_id}`
+                return
+              }
+            } else {
+              console.warn('[SignIn] Failed to accept invitation:', inviteResult.error)
+              // Still redirect to app even if invitation failed
+            }
+          } catch (inviteError) {
+            console.error('[SignIn] Error accepting invitation:', inviteError)
+          }
+        }
+
         window.location.href = '/app'
       } else {
         console.log('[SignIn] Failed:', result.error)

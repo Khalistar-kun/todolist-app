@@ -23,12 +23,17 @@ interface AuthContextType {
   status: AuthStatus
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
+  // Force refresh for bfcache recovery
+  forceRefresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Auth loading timeout (10 seconds max)
 const AUTH_TIMEOUT_MS = 10000
+
+// Visibility refresh debounce (prevent rapid refreshes)
+const VISIBILITY_DEBOUNCE_MS = 2000
 
 // Clear all user-related data from localStorage
 function clearUserStorage(userId?: string) {
@@ -60,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading')
   const initializedRef = useRef(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastVisibilityRefreshRef = useRef<number>(0)
+  const isMountedRef = useRef(true)
 
   // Helper to update auth state atomically
   const setAuthState = useCallback((newUser: AuthUser | null, isLoading: boolean) => {
@@ -103,12 +110,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(async () => {
     try {
       const currentUser = await getCurrentUser()
-      setUser(currentUser)
+      if (isMountedRef.current) {
+        setUser(currentUser)
+      }
     } catch (error) {
       console.error('[Auth] Error refreshing user:', error)
-      setUser(null)
+      if (isMountedRef.current) {
+        setUser(null)
+      }
     }
   }, [])
+
+  // Force refresh - validates session with server and refreshes all state
+  // Used for bfcache recovery and visibility changes
+  const forceRefresh = useCallback(async () => {
+    const now = Date.now()
+    // Debounce rapid refreshes
+    if (now - lastVisibilityRefreshRef.current < VISIBILITY_DEBOUNCE_MS) {
+      console.log('[Auth] Skipping force refresh - too soon since last refresh')
+      return
+    }
+    lastVisibilityRefreshRef.current = now
+
+    console.log('[Auth] Force refresh triggered - validating session')
+    try {
+      // CRITICAL: Use getUser() to validate with server, not getSession() which may be stale
+      const { data: { user: authUser }, error } = await supabase.auth.getUser()
+
+      if (!isMountedRef.current) return
+
+      if (error) {
+        console.warn('[Auth] Force refresh - session invalid:', error.message)
+        setAuthState(null, false)
+        return
+      }
+
+      if (authUser) {
+        // Session is valid - refresh profile
+        const profile = await getCurrentUser()
+        if (isMountedRef.current) {
+          setAuthState(profile, false)
+          console.log('[Auth] Force refresh complete - user authenticated')
+        }
+      } else {
+        // No user
+        if (isMountedRef.current) {
+          setAuthState(null, false)
+          console.log('[Auth] Force refresh complete - no user')
+        }
+      }
+    } catch (error) {
+      console.error('[Auth] Force refresh error:', error)
+      // Don't change state on error - keep existing state
+    }
+  }, [setAuthState])
 
   useEffect(() => {
     // Prevent double initialization in React StrictMode
@@ -222,12 +277,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearAuthTimeout, setAuthState, status])
 
+  // Handle page visibility changes and bfcache recovery
+  // CRITICAL for macOS/iOS Safari where bfcache causes stale state
+  useEffect(() => {
+    isMountedRef.current = true
+
+    // Handle visibility change (tab switching)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && status === 'authenticated') {
+        console.log('[Auth] Tab became visible - refreshing session')
+        forceRefresh()
+      }
+    }
+
+    // Handle pageshow (bfcache restoration) - CRITICAL for macOS Safari
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        console.log('[Auth] Page restored from bfcache - force refreshing')
+        // Always refresh on bfcache restoration regardless of current status
+        forceRefresh()
+      }
+    }
+
+    // Handle window focus (user clicks on window)
+    const handleFocus = () => {
+      if (status === 'authenticated') {
+        console.log('[Auth] Window focused - validating session')
+        forceRefresh()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      isMountedRef.current = false
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [status, forceRefresh])
+
   const value = {
     user,
     loading,
     status,
     signOut,
     refreshUser,
+    forceRefresh,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -8,6 +8,21 @@ export const metadata = {
   description: 'Simple, powerful task manager that helps teams get things done.',
 }
 
+// Inline script to prevent theme flash - runs before React hydrates
+// This MUST be inline to execute before any rendering
+const themeInitScript = `
+  (function() {
+    try {
+      var theme = localStorage.getItem('theme');
+      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {}
+  })();
+`
+
 export default function RootLayout({
   children,
 }: {
@@ -15,7 +30,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen">
+      <head>
+        {/* Inline theme script to prevent flash */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
         <ThemeProvider>
           <AuthProvider>
             {children}
