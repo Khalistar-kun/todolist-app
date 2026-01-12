@@ -66,26 +66,12 @@ export class ActivityService {
 
     if (!project) return []
 
-    // Fetch different activity types in parallel
-    const [tasks, comments, assignments] = await Promise.all([
+    // Fetch different activity types in parallel (without nested joins)
+    const [tasksResult, commentsResult, assignmentsResult] = await Promise.all([
       // Recent task updates
       supabase
         .from('tasks')
-        .select(`
-          id,
-          title,
-          created_at,
-          updated_at,
-          completed_at,
-          stage_id,
-          approval_status,
-          created_by,
-          creator:profiles!tasks_created_by_fkey (
-            full_name,
-            email,
-            avatar_url
-          )
-        `)
+        .select('id, title, created_at, updated_at, completed_at, stage_id, approval_status, created_by')
         .eq('project_id', projectId)
         .order('updated_at', { ascending: false })
         .limit(limit),
@@ -93,19 +79,7 @@ export class ActivityService {
       // Recent comments
       supabase
         .from('comments')
-        .select(`
-          id,
-          content,
-          created_at,
-          task_id,
-          created_by,
-          task:tasks (title),
-          creator:profiles!comments_created_by_fkey (
-            full_name,
-            email,
-            avatar_url
-          )
-        `)
+        .select('id, content, created_at, task_id, created_by')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(limit),
@@ -113,23 +87,47 @@ export class ActivityService {
       // Recent assignments
       supabase
         .from('task_assignments')
-        .select(`
-          id,
-          task_id,
-          user_id,
-          assigned_at,
-          assigned_by,
-          task:tasks (title, project_id),
-          user:profiles!task_assignments_user_id_fkey (full_name, email),
-          assigner:profiles!task_assignments_assigned_by_fkey (full_name, email, avatar_url)
-        `)
+        .select('id, task_id, user_id, assigned_at, assigned_by')
         .order('assigned_at', { ascending: false })
         .limit(limit),
     ])
 
+    const tasks = tasksResult
+    const comments = commentsResult
+    const assignments = assignmentsResult
+
+    // Collect all user IDs we need profiles for
+    const userIds = new Set<string>()
+    tasks.data?.forEach(t => t.created_by && userIds.add(t.created_by))
+    comments.data?.forEach(c => c.created_by && userIds.add(c.created_by))
+    assignments.data?.forEach(a => {
+      if (a.user_id) userIds.add(a.user_id)
+      if (a.assigned_by) userIds.add(a.assigned_by)
+    })
+
+    // Fetch all profiles at once
+    const { data: profiles } = userIds.size > 0 ? await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', Array.from(userIds)) : { data: [] }
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+
+    // Get task titles for comments and assignments
+    const taskIdsNeeded = new Set<string>()
+    comments.data?.forEach(c => c.task_id && taskIdsNeeded.add(c.task_id))
+    assignments.data?.forEach(a => a.task_id && taskIdsNeeded.add(a.task_id))
+
+    const { data: taskTitles } = taskIdsNeeded.size > 0 ? await supabase
+      .from('tasks')
+      .select('id, title, project_id')
+      .in('id', Array.from(taskIdsNeeded)) : { data: [] }
+
+    const taskMap = new Map(taskTitles?.map(t => [t.id, t]) || [])
+
     // Process tasks
     for (const task of tasks.data || []) {
-      const creator = task.creator as any
+      const creator = task.created_by ? profileMap.get(task.created_by) : null
 
       // Task created
       activities.push({
@@ -186,8 +184,8 @@ export class ActivityService {
 
     // Process comments
     for (const comment of comments.data || []) {
-      const creator = comment.creator as any
-      const task = comment.task as any
+      const creator = comment.created_by ? profileMap.get(comment.created_by) : null
+      const task = taskMap.get(comment.task_id)
 
       activities.push({
         id: `comment-${comment.id}`,
@@ -210,11 +208,11 @@ export class ActivityService {
 
     // Process assignments
     for (const assignment of assignments.data || []) {
-      const task = assignment.task as any
+      const task = taskMap.get(assignment.task_id)
       if (task?.project_id !== projectId) continue
 
-      const assigner = assignment.assigner as any
-      const user = assignment.user as any
+      const assigner = assignment.assigned_by ? profileMap.get(assignment.assigned_by) : null
+      const user = assignment.user_id ? profileMap.get(assignment.user_id) : null
 
       activities.push({
         id: `assignment-${assignment.id}`,
@@ -253,34 +251,70 @@ export class ActivityService {
     // Get user's project memberships
     const { data: memberships } = await supabase
       .from('project_members')
-      .select('project_id, project:projects (name, color)')
+      .select('project_id')
       .eq('user_id', userId)
 
-    const projectMap = new Map(
-      memberships?.map(m => [m.project_id, m.project as any]) || []
-    )
+    const projectIds = memberships?.map(m => m.project_id) || []
+
+    // Get projects info
+    const { data: projects } = projectIds.length > 0 ? await supabase
+      .from('projects')
+      .select('id, name, color')
+      .in('id', projectIds) : { data: [] }
+
+    const projectMap = new Map(projects?.map(p => [p.id, p]) || [])
 
     // Get tasks assigned to user
     const { data: assignments } = await supabase
       .from('task_assignments')
-      .select(`
-        id,
-        task_id,
-        assigned_at,
-        assigned_by,
-        task:tasks (title, project_id),
-        assigner:profiles!task_assignments_assigned_by_fkey (full_name, email, avatar_url)
-      `)
+      .select('id, task_id, assigned_at, assigned_by')
       .eq('user_id', userId)
       .order('assigned_at', { ascending: false })
       .limit(limit)
 
-    for (const assignment of assignments || []) {
-      const task = assignment.task as any
-      const assigner = assignment.assigner as any
-      const project = projectMap.get(task?.project_id)
+    // Get comments mentioning user
+    const { data: mentions } = await supabase
+      .from('comments')
+      .select('id, content, created_at, task_id, project_id, created_by')
+      .contains('mentions', [userId])
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
-      if (!project) continue
+    // Collect all task IDs and user IDs we need
+    const taskIds = new Set<string>()
+    const userIdsNeeded = new Set<string>()
+
+    assignments?.forEach(a => {
+      if (a.task_id) taskIds.add(a.task_id)
+      if (a.assigned_by) userIdsNeeded.add(a.assigned_by)
+    })
+    mentions?.forEach(c => {
+      if (c.task_id) taskIds.add(c.task_id)
+      if (c.created_by) userIdsNeeded.add(c.created_by)
+    })
+
+    // Fetch tasks and profiles
+    const { data: tasksData } = taskIds.size > 0 ? await supabase
+      .from('tasks')
+      .select('id, title, project_id')
+      .in('id', Array.from(taskIds)) : { data: [] }
+
+    const taskMap = new Map(tasksData?.map(t => [t.id, t]) || [])
+
+    const { data: profilesData } = userIdsNeeded.size > 0 ? await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', Array.from(userIdsNeeded)) : { data: [] }
+
+    const profileMap = new Map(profilesData?.map(p => [p.id, p]) || [])
+
+    // Process assignments
+    for (const assignment of assignments || []) {
+      const task = taskMap.get(assignment.task_id)
+      const assigner = assignment.assigned_by ? profileMap.get(assignment.assigned_by) : null
+      const project = task?.project_id ? projectMap.get(task.project_id) : null
+
+      if (!project || !task) continue
 
       activities.push({
         id: `assigned-${assignment.id}`,
@@ -299,26 +333,10 @@ export class ActivityService {
       })
     }
 
-    // Get comments mentioning user
-    const { data: mentions } = await supabase
-      .from('comments')
-      .select(`
-        id,
-        content,
-        created_at,
-        task_id,
-        project_id,
-        created_by,
-        task:tasks (title),
-        creator:profiles!comments_created_by_fkey (full_name, email, avatar_url)
-      `)
-      .contains('mentions', [userId])
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
+    // Process mentions
     for (const comment of mentions || []) {
-      const creator = comment.creator as any
-      const task = comment.task as any
+      const creator = comment.created_by ? profileMap.get(comment.created_by) : null
+      const task = taskMap.get(comment.task_id)
       const project = projectMap.get(comment.project_id)
 
       if (!project) continue
