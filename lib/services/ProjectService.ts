@@ -51,12 +51,13 @@ export class ProjectService {
     }
 
     const data = await response.json()
-    // Return basic project data - detailed member info can be fetched per project
+    // Return project data with task counts from API - detailed member info can be fetched per project
     return (data.projects || []).map((project: any) => ({
       ...project,
       members: [],
-      tasks_count: 0,
-      completed_tasks_count: 0,
+      tasks_count: project.tasks_count || 0,
+      completed_tasks_count: project.completed_tasks_count || 0,
+      pending_approval_count: project.pending_approval_count || 0,
     }))
   }
 

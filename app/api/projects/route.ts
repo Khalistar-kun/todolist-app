@@ -225,9 +225,50 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const projects = memberships?.map(m => m.project).filter(Boolean) || []
+    const rawProjects = memberships?.map(m => m.project).filter(Boolean) || []
 
-    return NextResponse.json({ projects })
+    // Fetch task counts for all projects in parallel
+    const projectsWithCounts = await Promise.all(
+      rawProjects.map(async (project: any) => {
+        // Get all tasks for this project
+        const { data: tasks } = await supabaseAdmin
+          .from('tasks')
+          .select('stage_id, approval_status')
+          .eq('project_id', project.id)
+
+        const tasksCount = tasks?.length || 0
+
+        // Find the "Done" stage
+        const workflowStages = project.workflow_stages || [
+          { id: 'todo', name: 'To Do', color: '#6B7280' },
+          { id: 'in_progress', name: 'In Progress', color: '#3B82F6' },
+          { id: 'review', name: 'Review', color: '#F59E0B' },
+          { id: 'done', name: 'Done', color: '#10B981' },
+        ]
+        const doneStage = workflowStages.find((s: any) => s.id === 'done' || s.name?.toLowerCase() === 'done')
+          || workflowStages[workflowStages.length - 1]
+        const doneStageId = doneStage?.id || 'done'
+
+        // Count completed tasks (in Done stage AND approved)
+        const completedTasksCount = tasks?.filter((t: any) =>
+          t.stage_id === doneStageId && t.approval_status === 'approved'
+        ).length || 0
+
+        // Count pending approval tasks
+        const pendingApprovalCount = tasks?.filter((t: any) =>
+          t.stage_id === doneStageId && t.approval_status === 'pending'
+        ).length || 0
+
+        return {
+          ...project,
+          tasks_count: tasksCount,
+          completed_tasks_count: completedTasksCount,
+          pending_approval_count: pendingApprovalCount,
+        }
+      })
+    )
+
+    return NextResponse.json({ projects: projectsWithCounts })
   } catch (error) {
     console.error('[API] Error fetching projects:', error)
     return NextResponse.json(
