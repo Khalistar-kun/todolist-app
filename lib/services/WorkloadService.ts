@@ -66,21 +66,20 @@ export class WorkloadService {
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     // Get task assignments with task details
+    // First get all assignments for project members
     const { data: assignments } = await supabase
       .from('task_assignments')
-      .select(`
-        user_id,
-        task:tasks (
-          id,
-          title,
-          project_id,
-          due_date,
-          start_date,
-          estimated_hours,
-          priority,
-          stage_id
-        )
-      `)
+      .select('user_id, task_id')
+      .in('user_id', memberUserIds)
+
+    // Get all tasks that are assigned
+    const taskIds = [...new Set(assignments?.map(a => a.task_id) || [])]
+    const { data: assignedTasks } = taskIds.length > 0 ? await supabase
+      .from('tasks')
+      .select('id, title, project_id, due_date, start_date, estimated_hours, priority, stage_id')
+      .in('id', taskIds) : { data: [] }
+
+    const taskMap = new Map(assignedTasks?.map(t => [t.id, t]) || [])
 
     // Get project info for filtering
     const { data: project } = await supabase
@@ -116,7 +115,7 @@ export class WorkloadService {
       let hoursNextWeek = 0
 
       for (const assignment of userAssignments) {
-        const task = (assignment as any).task
+        const task = taskMap.get(assignment.task_id)
         if (!task || task.stage_id === doneStageId) continue
 
         const projectInfo = projectMap.get(task.project_id)
@@ -203,22 +202,36 @@ export class WorkloadService {
     weekly_hours: number
     capacity_percentage: number
   }> {
+    // Get user's task assignments
     const { data: assignments } = await supabase
       .from('task_assignments')
-      .select(`
-        task:tasks (
-          id,
-          project_id,
-          stage_id,
-          due_date,
-          estimated_hours,
-          project:projects (
-            name,
-            workflow_stages
-          )
-        )
-      `)
+      .select('task_id')
       .eq('user_id', userId)
+
+    if (!assignments || assignments.length === 0) {
+      return {
+        total_tasks: 0,
+        tasks_by_project: [],
+        weekly_hours: 0,
+        capacity_percentage: 0,
+      }
+    }
+
+    // Get the tasks
+    const taskIds = assignments.map(a => a.task_id)
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, project_id, stage_id, due_date, estimated_hours')
+      .in('id', taskIds)
+
+    // Get all projects for those tasks
+    const projectIds = [...new Set(tasks?.map(t => t.project_id) || [])]
+    const { data: projects } = projectIds.length > 0 ? await supabase
+      .from('projects')
+      .select('id, name, workflow_stages')
+      .in('id', projectIds) : { data: [] }
+
+    const projectMap = new Map(projects?.map(p => [p.id, p]) || [])
 
     const now = new Date()
     const weekEnd = new Date(now)
@@ -228,11 +241,8 @@ export class WorkloadService {
     let totalTasks = 0
     let weeklyHours = 0
 
-    for (const assignment of assignments || []) {
-      const task = (assignment as any).task
-      if (!task) continue
-
-      const project = task.project
+    for (const task of tasks || []) {
+      const project = projectMap.get(task.project_id)
       const doneStageId = project?.workflow_stages?.find((s: any) =>
         s.is_done_stage || s.id === 'done'
       )?.id || 'done'

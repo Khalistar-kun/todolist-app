@@ -106,24 +106,37 @@ export class TaskService {
       throw taskError
     }
 
-    // Get assignees
-    const { data: assignees } = await supabase
+    // Get assignees - fetch assignments first, then profiles
+    const { data: assignments } = await supabase
       .from('task_assignments')
-      .select(`
-        user_id,
-        user:profiles(id, full_name, email, avatar_url)
-      `)
+      .select('user_id')
       .eq('task_id', taskId)
 
-    // Get subtasks with assignee info
-    const { data: subtasks } = await supabase
+    const assigneeIds = assignments?.map(a => a.user_id) || []
+    const { data: assigneeProfiles } = assigneeIds.length > 0 ? await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', assigneeIds) : { data: [] }
+
+    // Get subtasks
+    const { data: subtasksData } = await supabase
       .from('subtasks')
-      .select(`
-        *,
-        assignee:profiles!subtasks_assigned_to_fkey(id, full_name, email, avatar_url)
-      `)
+      .select('*')
       .eq('task_id', taskId)
       .order('created_at', { ascending: true })
+
+    // Get assignee profiles for subtasks
+    const subtaskAssigneeIds = [...new Set(subtasksData?.filter(s => s.assigned_to).map(s => s.assigned_to) || [])]
+    const { data: subtaskAssigneeProfiles } = subtaskAssigneeIds.length > 0 ? await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', subtaskAssigneeIds) : { data: [] }
+
+    const subtaskAssigneeMap = new Map(subtaskAssigneeProfiles?.map(p => [p.id, p]) || [])
+    const subtasks = subtasksData?.map(s => ({
+      ...s,
+      assignee: s.assigned_to ? subtaskAssigneeMap.get(s.assigned_to) || null : null,
+    })) || []
 
     // Get attachments
     const { data: attachments } = await supabase
@@ -148,7 +161,7 @@ export class TaskService {
 
     return {
       ...task,
-      assignees: assignees?.map(a => a.user) || [],
+      assignees: assigneeProfiles || [],
       subtasks: subtasks || [],
       comments_count: commentsCount || 0,
       attachments: attachments || [],
