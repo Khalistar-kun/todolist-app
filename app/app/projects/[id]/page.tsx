@@ -625,37 +625,48 @@ export default function ProjectPage() {
       <div className="max-w-7xl mx-auto">
         {/* Project Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
+          <div className="flex items-start sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
               <div
-                className="w-4 h-4 rounded-full"
+                className="w-4 h-4 rounded-full flex-shrink-0 mt-2 sm:mt-0"
                 style={{ backgroundColor: project.color }}
               />
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{project.name}</h1>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">{project.name}</h1>
                   {permissions.role && (
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${getRoleBadgeClasses()}`}>
+                    <span className={`text-xs font-medium px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap ${getRoleBadgeClasses()}`}>
                       {roleConfig[permissions.role].label}
                     </span>
                   )}
                 </div>
-                <p className="text-gray-600 dark:text-gray-400">{project.description}</p>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 line-clamp-2 sm:line-clamp-none">{project.description}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {permissions.canEdit && (
-                <button
-                  onClick={handleCreateTask}
-                  className="btn btn-md btn-primary"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Task
-                </button>
-              )}
-            </div>
+            {/* Desktop: Full button */}
+            {permissions.canEdit && (
+              <button
+                onClick={handleCreateTask}
+                className="hidden sm:inline-flex btn btn-md btn-primary flex-shrink-0"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Task
+              </button>
+            )}
+            {/* Mobile: Compact icon button */}
+            {permissions.canEdit && (
+              <button
+                onClick={handleCreateTask}
+                className="sm:hidden flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all tap-highlight-none"
+                aria-label="Add Task"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Project Stats */}
