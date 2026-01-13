@@ -35,7 +35,7 @@ export default function RootLayout({
         {/* Inline theme script to prevent flash */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
+      <body className="min-h-screen transition-colors">
         <ThemeProvider>
           <AuthProvider>
             <RealtimeProvider>

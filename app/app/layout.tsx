@@ -7,7 +7,7 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="min-h-screen transition-colors">
       <AppNavigation />
       <NotificationBanner />
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
