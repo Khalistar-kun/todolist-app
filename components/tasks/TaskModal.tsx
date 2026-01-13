@@ -10,6 +10,7 @@ import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete'
 import { MentionAutocomplete, MentionText } from '@/components/mentions/MentionAutocomplete'
 import { AIAssistButton } from '@/components/ai/AIAssistButton'
 import { AIDescriptionEnhancer } from '@/components/ai/AIDescriptionEnhancer'
+import { VoiceInputButton } from '@/components/ai/VoiceInputButton'
 import type { TaskAnalysis } from '@/hooks/useAI'
 
 interface CommentWithUser extends Comment {
@@ -57,6 +58,25 @@ interface ProjectMember {
     full_name: string | null
     email: string
     avatar_url: string | null
+  }
+}
+
+// Format ISO date to datetime-local input format (yyyy-MM-ddThh:mm)
+function formatDateForInput(isoDate: string | null | undefined): string {
+  if (!isoDate) return ''
+  try {
+    // Remove timezone info and seconds for datetime-local compatibility
+    const date = new Date(isoDate)
+    if (isNaN(date.getTime())) return ''
+    // Format as local datetime string
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  } catch {
+    return ''
   }
 }
 
@@ -179,7 +199,7 @@ export function TaskModal({
         title: task.title,
         description: task.description || '',
         priority: task.priority,
-        due_date: task.due_date || '',
+        due_date: formatDateForInput(task.due_date),
         tags: task.tags || [],
         stage_id: task.stage_id,
         links: existingLinks,
@@ -415,7 +435,7 @@ export function TaskModal({
             {/* Left Side - Form */}
             <div className="flex-1 p-4 sm:p-6 overflow-y-auto min-h-0">
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Title with AI Assist */}
+                {/* Title with AI Assist and Voice Input */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -431,17 +451,33 @@ export function TaskModal({
                       />
                     )}
                   </div>
-                  <input
-                    type="text"
-                    id="title"
-                    name="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
-                    placeholder="Enter task title"
-                    required
-                    disabled={readOnly}
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="title"
+                      name="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="flex-1 px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+                      placeholder="Enter task title or use voice input"
+                      required
+                      disabled={readOnly}
+                    />
+                    {!readOnly && (
+                      <VoiceInputButton
+                        onTranscript={(text) => setFormData({ ...formData, title: text })}
+                        onProcessedTask={(task) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            title: task.title,
+                            description: task.description || prev.description,
+                            priority: (task.priority as any) || prev.priority,
+                          }))
+                        }}
+                        disabled={readOnly}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Description with AI Enhancer */}
