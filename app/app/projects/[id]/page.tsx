@@ -39,6 +39,9 @@ export default function ProjectPage() {
   const [activeTab, setActiveTab] = useState<TabType>('board')
   const [forceReadOnly, setForceReadOnly] = useState(false)
   const [showPendingOnly, setShowPendingOnly] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const { permissions, loading: permissionsLoading } = useProjectPermissions(projectId)
   const isInitialLoadRef = useRef(true)
@@ -388,6 +391,31 @@ export default function ProjectPage() {
       // Rollback on error
       setTasks(previousTasks)
       toast.error(error.message || 'Failed to delete task')
+    }
+  }
+
+  // Handler for deleting the project (owner only)
+  const handleDeleteProject = async () => {
+    if (!project || deleteConfirmation !== project.name) return
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      toast.success('Project deleted successfully')
+      router.push('/app/projects')
+    } catch (error: any) {
+      console.error('Error deleting project:', error)
+      toast.error(error.message || 'Failed to delete project')
+    } finally {
+      setDeleting(false)
+      setShowDeleteModal(false)
+      setDeleteConfirmation('')
     }
   }
 
@@ -921,10 +949,37 @@ export default function ProjectPage() {
         )}
 
         {activeTab === 'settings' && (
-          <SlackIntegration
-            projectId={projectId}
-            canManage={permissions.canManageMembers}
-          />
+          <div className="space-y-6">
+            <SlackIntegration
+              projectId={projectId}
+              canManage={permissions.canManageMembers}
+            />
+
+            {/* Danger Zone - Only visible to owner */}
+            {permissions.role === 'owner' && (
+              <div className="card border-red-200 dark:border-red-900/50">
+                <div className="px-5 py-4 border-b border-red-100 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 rounded-t-xl">
+                  <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
+                </div>
+                <div className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">Delete this project</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Once deleted, all tasks, comments, and data will be permanently removed.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="btn btn-md bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+                    >
+                      Delete Project
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'timeline' && (
@@ -959,6 +1014,60 @@ export default function ProjectPage() {
             readOnly={forceReadOnly || !permissions.canEdit}
             defaultStageId={defaultStageId}
           />
+        )}
+
+        {/* Delete Project Modal */}
+        {showDeleteModal && project && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full animate-slide-up">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Project</h2>
+                </div>
+              </div>
+              <div className="px-6 py-4 space-y-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  This action <strong className="text-red-600 dark:text-red-400">cannot be undone</strong>. This will permanently delete the project <strong>{project.name}</strong> and all its tasks, comments, and data.
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Type <strong>{project.name}</strong> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    className="input w-full"
+                    placeholder={project.name}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteModal(false); setDeleteConfirmation('') }}
+                  className="btn btn-md btn-secondary"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteProject}
+                  disabled={deleting || deleteConfirmation !== project.name}
+                  className="btn btn-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Project'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -4,6 +4,7 @@ import { AuthProvider } from '@/app/providers/AuthProvider'
 import { RealtimeProvider } from '@/app/providers/RealtimeProvider'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { InteractiveBackground } from '@/components/ui/InteractiveBackground'
+import { GlobalAIButton } from '@/components/ai/GlobalAIButton'
 
 export const metadata = {
   title: 'TodoApp - Organize your work and life',
@@ -42,6 +43,7 @@ export default function RootLayout({
           <AuthProvider>
             <RealtimeProvider>
               {children}
+              <GlobalAIButton />
               <Toaster
               position="top-right"
               toastOptions={{

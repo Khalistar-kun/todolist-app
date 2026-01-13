@@ -151,3 +151,110 @@ export async function GET(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+// DELETE - Delete a project (owner only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: projectId } = await params
+    const cookieStore = await cookies()
+    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Check if user is the owner of this project
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json({ error: 'Project not found or you are not a member' }, { status: 404 })
+    }
+
+    if (membership.role !== 'owner') {
+      return NextResponse.json({ error: 'Only the project owner can delete the project' }, { status: 403 })
+    }
+
+    // Get project details for logging
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('name')
+      .eq('id', projectId)
+      .single()
+
+    // Delete related data in order (due to foreign key constraints)
+    // 1. Delete task comments
+    const { data: tasks } = await supabaseAdmin
+      .from('tasks')
+      .select('id')
+      .eq('project_id', projectId)
+
+    if (tasks && tasks.length > 0) {
+      const taskIds = tasks.map(t => t.id)
+      await supabaseAdmin
+        .from('task_comments')
+        .delete()
+        .in('task_id', taskIds)
+    }
+
+    // 2. Delete tasks
+    await supabaseAdmin
+      .from('tasks')
+      .delete()
+      .eq('project_id', projectId)
+
+    // 3. Delete project slack integrations
+    await supabaseAdmin
+      .from('project_slack_integrations')
+      .delete()
+      .eq('project_id', projectId)
+
+    // 4. Delete project invitations
+    await supabaseAdmin
+      .from('invitations')
+      .delete()
+      .eq('project_id', projectId)
+
+    // 5. Delete notifications related to this project
+    await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('data->>project_id', projectId)
+
+    // 6. Delete project members
+    await supabaseAdmin
+      .from('project_members')
+      .delete()
+      .eq('project_id', projectId)
+
+    // 7. Finally, delete the project itself
+    const { error: deleteError } = await supabaseAdmin
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+
+    if (deleteError) {
+      console.error('[API] Error deleting project:', deleteError)
+      return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 })
+    }
+
+    console.log(`[API] Project deleted: ${project?.name} by user ${user.id}`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Project deleted successfully'
+    })
+  } catch (error) {
+    console.error('[API] Error in DELETE /api/projects/[id]:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
