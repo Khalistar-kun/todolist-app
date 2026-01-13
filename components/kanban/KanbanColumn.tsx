@@ -82,7 +82,7 @@ export function KanbanColumn({
 
   return (
     <div className="flex-shrink-0 w-[80vw] sm:w-80 snap-start sm:snap-align-none">
-      <div className="card h-full flex flex-col" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
+      <div className="card h-full flex flex-col" style={{ backgroundColor: 'var(--bg-column)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
         {/* Column Header */}
         <div className="px-4 py-3" style={{ backgroundColor: 'var(--bg-section)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center justify-between">

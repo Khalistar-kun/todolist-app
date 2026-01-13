@@ -236,21 +236,17 @@ export function TaskCard({
   return (
     <div
       ref={setNodeRef}
-      style={{
-        ...style,
-        backgroundColor: 'var(--bg-card)',
-        border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-        boxShadow: 'var(--shadow-card)',
-      }}
       data-task-card="true"
       data-sortable="true"
       className={`relative rounded-lg p-4 cursor-pointer transition-all duration-200 group overflow-hidden touch-none sm:touch-auto ${
         isDragging ? 'opacity-50 scale-95' : ''
-      } ${
-        isSelected
-          ? 'ring-2 ring-blue-500/30 dark:ring-blue-400/30'
-          : ''
       }`}
+      style={{
+        ...style,
+        backgroundColor: 'var(--bg-card)',
+        border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+        boxShadow: isSelected ? '0 0 0 3px rgba(19, 151, 211, 0.15)' : 'var(--shadow-card)',
+      }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-card-hover)' }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-card)' }}
       onClick={handleCardClick}
@@ -266,7 +262,10 @@ export function TaskCard({
       )}
       {/* Selection checkbox indicator */}
       {isSelected && (
-        <div className="absolute -top-2 -left-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md z-10">
+        <div
+          className="absolute -top-2 -left-2 w-5 h-5 rounded-full flex items-center justify-center shadow-md z-10"
+          style={{ backgroundColor: 'var(--accent-primary)' }}
+        >
           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
           </svg>
