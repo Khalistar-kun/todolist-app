@@ -74,7 +74,7 @@ export function NotificationBanner() {
   if (!isVisible || notifications.length === 0) return null
 
   return (
-    <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
+    <div className="fixed top-16 inset-x-0 z-50 px-3 sm:px-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-lg">
       <div className="space-y-2">
         {notifications.map((notif, index) => (
           <div

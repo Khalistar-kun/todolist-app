@@ -566,7 +566,7 @@ export function AppNavigation() {
 
               {/* Notifications Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden animate-scale-in">
+                <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:right-0 mt-2 sm:w-80 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden animate-scale-in z-50">
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
                     {unreadCount > 0 && (
