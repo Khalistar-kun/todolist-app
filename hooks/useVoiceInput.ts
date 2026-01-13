@@ -134,10 +134,21 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
               errorMessage = 'Microphone access denied. Please allow microphone access.'
               break
             case 'network':
-              errorMessage = 'Network error. Please check your connection.'
+              // Network error can occur when:
+              // 1. Not on HTTPS (localhost is exempt)
+              // 2. Browser can't reach speech recognition servers
+              // 3. Firewall/proxy blocking the connection
+              if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                errorMessage = 'Voice input requires HTTPS. Please use a secure connection.'
+              } else {
+                errorMessage = 'Network error. Speech recognition requires an internet connection.'
+              }
               break
             case 'aborted':
-              errorMessage = 'Voice input cancelled.'
+              // Don't show error for user-initiated abort
+              return
+            case 'service-not-allowed':
+              errorMessage = 'Speech recognition service not available. Try refreshing the page.'
               break
           }
           onError(errorMessage)
