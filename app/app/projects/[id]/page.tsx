@@ -323,6 +323,34 @@ export default function ProjectPage() {
     handleModalClose()
   }
 
+  // Handler for voice command task creation
+  const handleVoiceCreateTask = useCallback(async (taskData: { title: string; description?: string; priority?: string }) => {
+    if (!permissions.canEdit) {
+      toast.error('You do not have permission to create tasks')
+      return
+    }
+
+    if (!project) return
+
+    try {
+      // Get the first stage (usually "To Do" or similar)
+      const firstStage = project.workflow_stages?.[0]?.id || 'todo'
+
+      await TaskService.createTask({
+        project_id: projectId,
+        title: taskData.title,
+        description: taskData.description,
+        priority: (taskData.priority as 'none' | 'low' | 'medium' | 'high' | 'urgent') || 'none',
+        stage_id: firstStage,
+      })
+
+      // Refresh tasks list
+      fetchProjectData()
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create task')
+    }
+  }, [permissions.canEdit, project, projectId, fetchProjectData])
+
   // Handler for deleting a task from the card menu
   const handleTaskDelete = async (task: Task) => {
     if (!permissions.canEdit) {
@@ -870,6 +898,7 @@ export default function ProjectPage() {
               projectId={projectId}
               projectName={project.name}
               onActionClick={handleAIActionClick}
+              onCreateTask={permissions.canEdit ? handleVoiceCreateTask : undefined}
               useEnhancedAI={true}
             />
           </div>

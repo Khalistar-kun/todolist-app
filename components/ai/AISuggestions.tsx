@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { AITaskService, TaskSuggestion } from '@/lib/services/AITaskService'
+import { useVoiceInput } from '@/hooks/useVoiceInput'
+import toast from 'react-hot-toast'
 
 interface AISuggestionsProps {
   projectId: string
   projectName?: string
   onActionClick?: (action: TaskSuggestion['action']) => void
+  onCreateTask?: (task: { title: string; description?: string; priority?: string }) => void
   useEnhancedAI?: boolean
 }
 
@@ -90,7 +93,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   ),
 }
 
-export function AISuggestions({ projectId, projectName, onActionClick, useEnhancedAI = true }: AISuggestionsProps) {
+export function AISuggestions({ projectId, projectName, onActionClick, onCreateTask, useEnhancedAI = true }: AISuggestionsProps) {
   // ============================================================================
   // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
   // ============================================================================
@@ -100,6 +103,10 @@ export function AISuggestions({ projectId, projectName, onActionClick, useEnhanc
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // Voice input state
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
 
   // Drag state
   const [position, setPosition] = useState<Position | null>(null)
@@ -179,6 +186,110 @@ export function AISuggestions({ projectId, projectName, onActionClick, useEnhanc
   const handleDismiss = useCallback((id: string) => {
     setDismissed(prev => new Set([...prev, id]))
   }, [])
+
+  // Voice input result handler
+  const handleVoiceResult = useCallback(async (result: { transcript: string; isFinal: boolean }) => {
+    if (!result.isFinal) return
+
+    const text = result.transcript.trim()
+    if (!text) return
+
+    setVoiceTranscript(text)
+    setIsProcessingVoice(true)
+
+    try {
+      // Use AI to parse the voice command
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'chat',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a task parser. Extract task information from voice commands.
+Return a JSON object with:
+- title: the main task title (required)
+- description: additional details if mentioned (optional)
+- priority: "low", "medium", "high", or "urgent" if mentioned (optional)
+
+Examples:
+- "Create a task to review the quarterly report by tomorrow" -> {"title": "Review the quarterly report"}
+- "Add high priority task fix the login bug" -> {"title": "Fix the login bug", "priority": "high"}
+- "New task implement user dashboard with charts and analytics" -> {"title": "Implement user dashboard", "description": "Include charts and analytics"}
+
+Only return valid JSON, nothing else.`
+            },
+            {
+              role: 'user',
+              content: text
+            }
+          ]
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        try {
+          const jsonMatch = data.response.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0])
+            if (parsed.title && onCreateTask) {
+              onCreateTask({
+                title: parsed.title,
+                description: parsed.description,
+                priority: parsed.priority,
+              })
+              toast.success(`Task created: ${parsed.title}`)
+              setVoiceTranscript('')
+            }
+          }
+        } catch {
+          // If parsing fails, use the raw transcript as title
+          if (onCreateTask) {
+            onCreateTask({ title: text })
+            toast.success(`Task created: ${text}`)
+            setVoiceTranscript('')
+          }
+        }
+      } else {
+        // Fallback: create task with raw transcript
+        if (onCreateTask) {
+          onCreateTask({ title: text })
+          toast.success(`Task created: ${text}`)
+          setVoiceTranscript('')
+        }
+      }
+    } catch (error) {
+      console.error('[VoiceInput] AI processing error:', error)
+      // Fallback: create task with raw transcript
+      if (onCreateTask) {
+        onCreateTask({ title: text })
+        toast.success(`Task created: ${text}`)
+        setVoiceTranscript('')
+      }
+    } finally {
+      setIsProcessingVoice(false)
+    }
+  }, [onCreateTask])
+
+  // Voice input error handler
+  const handleVoiceError = useCallback((error: string) => {
+    toast.error(error)
+  }, [])
+
+  // Voice input hook
+  const {
+    isListening,
+    isSupported: isVoiceSupported,
+    transcript: liveTranscript,
+    startListening,
+    stopListening,
+  } = useVoiceInput({
+    onResult: handleVoiceResult,
+    onError: handleVoiceError,
+    continuous: false,
+  })
 
   // Reset position to default
   const handleResetPosition = useCallback(() => {
@@ -469,8 +580,68 @@ export function AISuggestions({ projectId, projectName, onActionClick, useEnhanc
             </div>
           </div>
 
+          {/* Voice Input Section */}
+          {isVoiceSupported && onCreateTask && (
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={isProcessingVoice}
+                  className={`relative flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                    isListening
+                      ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/30'
+                      : isProcessingVoice
+                        ? 'bg-purple-100 dark:bg-purple-900/30 cursor-wait'
+                        : 'bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50'
+                  }`}
+                  title={isListening ? 'Stop listening' : 'Speak to create task'}
+                >
+                  {isProcessingVoice ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-300 border-t-purple-600" />
+                  ) : isListening ? (
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  {isListening ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Listening...</span>
+                      </div>
+                      {liveTranscript && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{liveTranscript}</p>
+                      )}
+                    </div>
+                  ) : isProcessingVoice ? (
+                    <div className="space-y-1">
+                      <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Creating task...</span>
+                      {voiceTranscript && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{voiceTranscript}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Command</span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Tap mic and say: &quot;Create task to...&quot;</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Content */}
-          <div className="max-h-[calc(70vh-52px)] overflow-y-auto">
+          <div className={`max-h-[calc(70vh-${isVoiceSupported && onCreateTask ? '120px' : '52px'})] overflow-y-auto`}>
             {loading ? (
               <div className="p-4 space-y-3">
                 {[1, 2, 3].map(i => (
