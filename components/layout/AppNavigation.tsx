@@ -510,10 +510,9 @@ export function AppNavigation() {
                       }
                     }}
                   >
-                    <item.icon
-                      className="w-4 h-4"
-                      style={{ color: active ? 'var(--accent-primary)' : 'var(--icon-default)' }}
-                    />
+                    <span style={{ color: active ? 'var(--accent-primary)' : 'var(--icon-default)' }}>
+                      <item.icon className="w-4 h-4" />
+                    </span>
                     {item.name}
                   </Link>
                 )
@@ -546,7 +545,7 @@ export function AppNavigation() {
                   e.currentTarget.style.color = 'var(--icon-default)'
                 }}
               >
-                <BellIcon className="w-5 h-5" style={{ color: hasNewNotification ? 'var(--accent-primary)' : 'inherit' }} />
+                <BellIcon className={`w-5 h-5 ${hasNewNotification ? 'text-[var(--accent-primary)]' : ''}`} />
                 {unreadCount > 0 && (
                   <span
                     className={`absolute top-1 right-1 w-4 h-4 rounded-full text-white text-xs flex items-center justify-center font-medium ${
@@ -794,10 +793,9 @@ export function AppNavigation() {
                     backgroundColor: active ? 'rgba(19, 151, 211, 0.1)' : 'transparent',
                   }}
                 >
-                  <item.icon
-                    className="w-5 h-5"
-                    style={{ color: active ? 'var(--accent-primary)' : 'var(--icon-default)' }}
-                  />
+                  <span style={{ color: active ? 'var(--accent-primary)' : 'var(--icon-default)' }}>
+                    <item.icon className="w-5 h-5" />
+                  </span>
                   {item.name}
                 </Link>
               )
