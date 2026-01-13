@@ -135,6 +135,21 @@ export async function POST(request: NextRequest) {
           s.name.toLowerCase() === 'todo' || s.name.toLowerCase() === 'to do'
         )
 
+        // Get the project owner to use as created_by (required field)
+        const { data: ownerMember } = await supabaseAdmin
+          .from('project_members')
+          .select('user_id')
+          .eq('project_id', slackIntegration.project_id)
+          .eq('role', 'owner')
+          .single()
+
+        if (!ownerMember) {
+          return NextResponse.json({
+            response_type: 'ephemeral',
+            text: `Failed to create task: Could not find project owner`
+          })
+        }
+
         // Create the task
         const { data: task, error } = await supabaseAdmin
           .from('tasks')
@@ -144,6 +159,7 @@ export async function POST(request: NextRequest) {
             status: 'todo',
             priority: 'none',
             stage_id: todoStage?.id || null,
+            created_by: ownerMember.user_id,
           })
           .select()
           .single()
