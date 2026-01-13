@@ -466,19 +466,22 @@ export function AppNavigation() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 glass border-b border-gray-200 dark:border-gray-800">
+    <nav className="sticky top-0 z-40 glass">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo & Nav Links */}
           <div className="flex items-center gap-8">
             {/* Logo */}
             <Link href="/app" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center group-hover:bg-blue-700 transition-colors">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all group-hover:scale-105"
+                style={{ background: 'var(--btn-primary-gradient)' }}
+              >
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">TodoApp</span>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>TodoApp</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -489,15 +492,28 @@ export function AppNavigation() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`
-                      flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-                      ${active
-                        ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800'
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      backgroundColor: active ? 'rgba(19, 151, 211, 0.1)' : 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                        e.currentTarget.style.color = 'var(--text-primary)'
                       }
-                    `}
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.color = 'var(--text-secondary)'
+                      }
+                    }}
                   >
-                    <item.icon className={`w-4 h-4 ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`} />
+                    <item.icon
+                      className="w-4 h-4"
+                      style={{ color: active ? 'var(--accent-primary)' : 'var(--icon-default)' }}
+                    />
                     {item.name}
                   </Link>
                 )
@@ -517,20 +533,35 @@ export function AppNavigation() {
                   setShowNotifications(!showNotifications)
                   setHasNewNotification(false)
                 }}
-                className={`relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors ${
+                className={`relative p-2 rounded-lg transition-colors ${
                   hasNewNotification ? 'animate-bounce' : ''
                 }`}
+                style={{ color: 'var(--icon-default)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                  e.currentTarget.style.color = 'var(--icon-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'var(--icon-default)'
+                }}
               >
-                <BellIcon className={`w-5 h-5 ${hasNewNotification ? 'text-blue-500 dark:text-blue-400' : ''}`} />
+                <BellIcon className="w-5 h-5" style={{ color: hasNewNotification ? 'var(--accent-primary)' : 'inherit' }} />
                 {unreadCount > 0 && (
-                  <span className={`absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center font-medium ${
-                    hasNewNotification ? 'animate-ping-once' : ''
-                  }`}>
+                  <span
+                    className={`absolute top-1 right-1 w-4 h-4 rounded-full text-white text-xs flex items-center justify-center font-medium ${
+                      hasNewNotification ? 'animate-ping-once' : ''
+                    }`}
+                    style={{ backgroundColor: 'var(--accent-danger)' }}
+                  >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
                 {hasNewNotification && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full animate-ping"></span>
+                  <span
+                    className="absolute top-1 right-1 w-4 h-4 rounded-full animate-ping"
+                    style={{ backgroundColor: 'var(--accent-danger)' }}
+                  ></span>
                 )}
               </button>
 
@@ -644,7 +675,9 @@ export function AppNavigation() {
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="flex items-center gap-2 p-1 rounded-lg transition-colors"
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 {avatarUrl ? (
                   avatarUrl.startsWith('data:') ? (
@@ -665,11 +698,17 @@ export function AppNavigation() {
                     />
                   )
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                    style={{ background: 'var(--btn-primary-gradient)' }}
+                  >
                     {displayName[0].toUpperCase()}
                   </div>
                 )}
-                <ChevronDownIcon className={`hidden sm:block w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+                <ChevronDownIcon
+                  className={`hidden sm:block w-4 h-4 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
+                  style={{ color: 'var(--icon-default)' }}
+                />
               </button>
 
               {/* Dropdown Menu */}
@@ -715,7 +754,16 @@ export function AppNavigation() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className="md:hidden p-2 rounded-lg transition-colors"
+              style={{ color: 'var(--icon-default)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                e.currentTarget.style.color = 'var(--icon-hover)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.color = 'var(--icon-default)'
+              }}
             >
               {showMobileMenu ? <XIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
             </button>
@@ -725,7 +773,13 @@ export function AppNavigation() {
 
       {/* Mobile Menu */}
       {showMobileMenu && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div
+          className="md:hidden"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderTop: '1px solid var(--border-subtle)',
+          }}
+        >
           <div className="px-4 py-3 space-y-1">
             {navigation.map((item) => {
               const active = isActive(item.href)
@@ -734,15 +788,16 @@ export function AppNavigation() {
                   key={item.name}
                   href={item.href}
                   onClick={() => setShowMobileMenu(false)}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                    ${active
-                      ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800'
-                    }
-                  `}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  style={{
+                    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    backgroundColor: active ? 'rgba(19, 151, 211, 0.1)' : 'transparent',
+                  }}
                 >
-                  <item.icon className={`w-5 h-5 ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`} />
+                  <item.icon
+                    className="w-5 h-5"
+                    style={{ color: active ? 'var(--accent-primary)' : 'var(--icon-default)' }}
+                  />
                   {item.name}
                 </Link>
               )
