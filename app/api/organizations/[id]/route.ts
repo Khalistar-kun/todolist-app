@@ -163,3 +163,102 @@ export async function GET(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+// DELETE - Delete an organization (owner only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: organizationId } = await params
+    const cookieStore = await cookies()
+    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Check if user is the owner of this organization
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json({ error: 'Organization not found or you are not a member' }, { status: 404 })
+    }
+
+    if (membership.role !== 'owner') {
+      return NextResponse.json({ error: 'Only the organization owner can delete the organization' }, { status: 403 })
+    }
+
+    // Get organization details for logging
+    const { data: organization } = await supabaseAdmin
+      .from('organizations')
+      .select('name, slug')
+      .eq('id', organizationId)
+      .single()
+
+    // Delete related data in order (due to foreign key constraints)
+    // 1. Delete org slack integrations
+    await supabaseAdmin
+      .from('org_slack_integrations')
+      .delete()
+      .eq('organization_id', organizationId)
+
+    // 2. Delete organization meetings
+    await supabaseAdmin
+      .from('organization_meetings')
+      .delete()
+      .eq('organization_id', organizationId)
+
+    // 3. Delete organization announcements
+    await supabaseAdmin
+      .from('organization_announcements')
+      .delete()
+      .eq('organization_id', organizationId)
+
+    // 4. Delete notifications related to this org
+    await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('organization_id', organizationId)
+
+    // 5. Delete organization members
+    await supabaseAdmin
+      .from('organization_members')
+      .delete()
+      .eq('organization_id', organizationId)
+
+    // 6. Update projects to remove organization reference (don't delete projects)
+    await supabaseAdmin
+      .from('projects')
+      .update({ organization_id: null })
+      .eq('organization_id', organizationId)
+
+    // 7. Finally, delete the organization itself
+    const { error: deleteError } = await supabaseAdmin
+      .from('organizations')
+      .delete()
+      .eq('id', organizationId)
+
+    if (deleteError) {
+      console.error('[API] Error deleting organization:', deleteError)
+      return NextResponse.json({ error: 'Failed to delete organization' }, { status: 500 })
+    }
+
+    console.log(`[API] Organization deleted: ${organization?.name} (${organization?.slug}) by user ${user.id}`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Organization deleted successfully'
+    })
+  } catch (error) {
+    console.error('[API] Error in DELETE /api/organizations/[id]:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

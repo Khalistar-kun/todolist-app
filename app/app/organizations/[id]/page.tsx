@@ -127,6 +127,11 @@ export default function OrganizationDetailPage() {
   const [inviteRole, setInviteRole] = useState('member')
   const [inviting, setInviting] = useState(false)
 
+  // Delete organization modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
   const organizationId = params.id as string
   const isInitialLoadRef = useRef(true)
 
@@ -310,6 +315,31 @@ export default function OrganizationDetailPage() {
       toast.error(error.message || 'Failed to invite member')
     } finally {
       setInviting(false)
+    }
+  }
+
+  const handleDeleteOrganization = async () => {
+    if (!organization || deleteConfirmation !== organization.name) return
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/organizations/${organizationId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      playSuccess()
+      toast.success('Organization deleted successfully')
+      router.push('/app/organizations')
+    } catch (error: any) {
+      console.error('Error deleting organization:', error)
+      toast.error(error.message || 'Failed to delete organization')
+    } finally {
+      setDeleting(false)
+      setShowDeleteModal(false)
+      setDeleteConfirmation('')
     }
   }
 
@@ -684,6 +714,31 @@ export default function OrganizationDetailPage() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">Configure integrations and manage your organization</p>
                 </div>
                 <OrganizationSlackIntegration organizationId={organizationId} canManage={canManage} />
+
+                {/* Danger Zone - Only visible to owner */}
+                {currentUserRole === 'owner' && (
+                  <div className="card border-red-200 dark:border-red-900/50">
+                    <div className="px-5 py-4 border-b border-red-100 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 rounded-t-xl">
+                      <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
+                    </div>
+                    <div className="p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">Delete this organization</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Once deleted, all members will lose access. Projects will be unlinked but not deleted.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { playClick(); setShowDeleteModal(true) }}
+                          className="btn btn-md bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+                        >
+                          Delete Organization
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="card p-12 text-center">
@@ -919,6 +974,63 @@ export default function OrganizationDetailPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Organization Modal */}
+      {showDeleteModal && organization && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full animate-slide-up">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Organization</h2>
+              </div>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                This action <strong className="text-red-600 dark:text-red-400">cannot be undone</strong>. This will permanently delete the organization <strong>{organization.name}</strong> and remove all members.
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Projects belonging to this organization will be unlinked but not deleted.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Type <strong>{organization.name}</strong> to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  className="input w-full"
+                  placeholder={organization.name}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmation('') }}
+                className="btn btn-md btn-secondary"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteOrganization}
+                disabled={deleting || deleteConfirmation !== organization.name}
+                className="btn btn-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Organization'}
+              </button>
+            </div>
           </div>
         </div>
       )}
