@@ -123,6 +123,18 @@ export async function POST(request: NextRequest) {
           })
         }
 
+        // Get project workflow stages to find the 'todo' stage UUID
+        const { data: project } = await supabaseAdmin
+          .from('projects')
+          .select('workflow_stages')
+          .eq('id', slackIntegration.project_id)
+          .single()
+
+        // Find the todo stage - look for 'todo' or 'to do' in stage names
+        const todoStage = project?.workflow_stages?.find((s: { id: string; name: string }) =>
+          s.name.toLowerCase() === 'todo' || s.name.toLowerCase() === 'to do'
+        )
+
         // Create the task
         const { data: task, error } = await supabaseAdmin
           .from('tasks')
@@ -131,7 +143,7 @@ export async function POST(request: NextRequest) {
             title: taskTitle,
             status: 'todo',
             priority: 'none',
-            stage_id: 'todo',
+            stage_id: todoStage?.id || null,
           })
           .select()
           .single()
