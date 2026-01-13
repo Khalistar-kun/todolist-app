@@ -704,10 +704,11 @@ export function AppNavigation() {
                     {displayName[0].toUpperCase()}
                   </div>
                 )}
-                <ChevronDownIcon
-                  className={`hidden sm:block w-4 h-4 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
-                  style={{ color: 'var(--icon-default)' }}
-                />
+                <span style={{ color: 'var(--icon-default)' }}>
+                  <ChevronDownIcon
+                    className={`hidden sm:block w-4 h-4 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
+                  />
+                </span>
               </button>
 
               {/* Dropdown Menu */}
