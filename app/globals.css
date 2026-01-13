@@ -11,7 +11,7 @@
 :root {
   /* Base Surfaces - Warm off-white tones for visual depth */
   --bg-app: #F5F7FB;
-  --bg-app-gradient: linear-gradient(135deg, #F5F7FB 0%, #E8F4FD 50%, #F0E8FC 100%);
+  --bg-app-gradient: linear-gradient(135deg, #E3F0FF 0%, #D4E8FD 35%, #E8D8F8 70%, #F0E0FA 100%);
   --bg-surface: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-card-hover: #F8FAFC;
@@ -82,7 +82,7 @@
 .dark {
   /* Base Surfaces */
   --bg-app: #0F172A;
-  --bg-app-gradient: linear-gradient(135deg, #0F172A 0%, #0C1929 50%, #131525 100%);
+  --bg-app-gradient: linear-gradient(135deg, #0F172A 0%, #0D1A2D 35%, #151530 70%, #1A1535 100%);
   --bg-surface: #1E293B;
   --bg-card: #1E293B;
   --bg-card-hover: #334155;
