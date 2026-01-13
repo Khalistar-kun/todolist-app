@@ -17,10 +17,10 @@
   --bg-input: #ffffff;
   --bg-sidebar: #ffffff;
 
-  /* Border colors */
-  --border-subtle: #e5e7eb;
-  --border-default: #d1d5db;
-  --border-strong: #9ca3af;
+  /* Border colors - more visible */
+  --border-subtle: #d1d5db;
+  --border-default: #9ca3af;
+  --border-strong: #6b7280;
 
   /* Text colors - improved contrast for readability */
   --text-primary: #111827;
@@ -33,11 +33,11 @@
   --icon-hover: #111827;
   --icon-muted: #6b7280;
 
-  /* Shadows - subtle elevation */
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-card-hover: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
-  --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
-  --shadow-dropdown: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  /* Shadows - more visible elevation */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-card-hover: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+  --shadow-dropdown: 0 10px 15px -3px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.08);
 
   /* Priority badge colors - better contrast */
   --priority-low-bg: #dcfce7;
