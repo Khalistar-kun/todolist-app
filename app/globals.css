@@ -22,16 +22,16 @@
   --border-default: #d1d5db;
   --border-strong: #9ca3af;
 
-  /* Text colors - proper hierarchy */
+  /* Text colors - improved contrast for readability */
   --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
-  --text-placeholder: #9ca3af;
+  --text-secondary: #374151;
+  --text-muted: #4b5563;
+  --text-placeholder: #6b7280;
 
-  /* Icon colors */
-  --icon-default: #6b7280;
+  /* Icon colors - improved visibility */
+  --icon-default: #4b5563;
   --icon-hover: #111827;
-  --icon-muted: #9ca3af;
+  --icon-muted: #6b7280;
 
   /* Shadows - subtle elevation */
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -39,25 +39,25 @@
   --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
   --shadow-dropdown: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
 
-  /* Priority badge colors - muted, not alarming */
-  --priority-low-bg: #E6F4EA;
-  --priority-low-text: #1E7F4F;
-  --priority-medium-bg: #FFF4E5;
-  --priority-medium-text: #8A5A00;
-  --priority-high-bg: #FDECEC;
-  --priority-high-text: #B42318;
-  --priority-urgent-bg: #FCE8E6;
-  --priority-urgent-text: #8F1D18;
-  --priority-none-bg: #f3f4f6;
-  --priority-none-text: #6b7280;
+  /* Priority badge colors - better contrast */
+  --priority-low-bg: #dcfce7;
+  --priority-low-text: #166534;
+  --priority-medium-bg: #fef3c7;
+  --priority-medium-text: #92400e;
+  --priority-high-bg: #fee2e2;
+  --priority-high-text: #991b1b;
+  --priority-urgent-bg: #fecaca;
+  --priority-urgent-text: #7f1d1d;
+  --priority-none-bg: #e5e7eb;
+  --priority-none-text: #374151;
 
-  /* Status colors */
-  --status-todo-bg: #f3f4f6;
-  --status-todo-text: #4b5563;
+  /* Status colors - better contrast */
+  --status-todo-bg: #e5e7eb;
+  --status-todo-text: #374151;
   --status-progress-bg: #dbeafe;
-  --status-progress-text: #1d4ed8;
+  --status-progress-text: #1e40af;
   --status-done-bg: #dcfce7;
-  --status-done-text: #15803d;
+  --status-done-text: #166534;
 
   /* Accent/interactive colors */
   --accent-primary: #2563eb;
