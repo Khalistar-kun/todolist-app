@@ -719,7 +719,18 @@ export default function ProjectPage() {
                 Add Task
               </button>
             )}
-            {/* Mobile Add Task button moved to floating FAB at bottom */}
+            {/* Mobile: Icon-only button */}
+            {permissions.canEdit && (
+              <button
+                onClick={handleCreateTask}
+                className="sm:hidden w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md active:scale-95 transition-all tap-highlight-none flex-shrink-0"
+                aria-label="Add Task"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Project Stats */}
@@ -1051,10 +1062,9 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Floating Action Buttons - Bottom Right */}
+        {/* Floating AI Quests Button - Bottom Right */}
         {project && (
-          <div className="fixed bottom-4 right-4 z-40 flex items-end gap-3">
-            {/* AI Insights Button */}
+          <div className="fixed bottom-4 right-4 z-40">
             <AISuggestions
               projectId={projectId}
               projectName={project.name}
@@ -1064,19 +1074,6 @@ export default function ProjectPage() {
               members={project.members}
               inline={true}
             />
-
-            {/* Mobile Add Task FAB */}
-            {permissions.canEdit && (
-              <button
-                onClick={handleCreateTask}
-                className="sm:hidden w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white flex items-center justify-center shadow-lg hover:shadow-xl active:scale-95 transition-all tap-highlight-none"
-                aria-label="Add Task"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-            )}
           </div>
         )}
       </div>
