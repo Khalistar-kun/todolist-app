@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/app/providers/AuthProvider'
 import { RealtimeProvider } from '@/app/providers/RealtimeProvider'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { InteractiveBackground } from '@/components/ui/InteractiveBackground'
 
 export const metadata = {
   title: 'TodoApp - Organize your work and life',
@@ -36,6 +37,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-screen transition-colors">
+        <InteractiveBackground />
         <ThemeProvider>
           <AuthProvider>
             <RealtimeProvider>
