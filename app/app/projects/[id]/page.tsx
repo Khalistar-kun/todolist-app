@@ -719,18 +719,7 @@ export default function ProjectPage() {
                 Add Task
               </button>
             )}
-            {/* Mobile: Compact icon button */}
-            {permissions.canEdit && (
-              <button
-                onClick={handleCreateTask}
-                className="sm:hidden flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all tap-highlight-none"
-                aria-label="Add Task"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-            )}
+            {/* Mobile Add Task button moved to floating FAB at bottom */}
           </div>
 
           {/* Project Stats */}
@@ -929,15 +918,7 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {/* AI Insights - Floating Quest Box (Enhanced with Groq AI) */}
-            <AISuggestions
-              projectId={projectId}
-              projectName={project.name}
-              onActionClick={handleAIActionClick}
-              onCreateTask={permissions.canEdit ? handleVoiceCreateTask : undefined}
-              useEnhancedAI={true}
-              members={project.members}
-            />
+            {/* AI Insights moved to floating FAB container */}
           </div>
         )}
 
@@ -1067,6 +1048,35 @@ export default function ProjectPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Floating Action Buttons - Bottom Right */}
+        {project && (
+          <div className="fixed bottom-4 right-4 z-40 flex items-end gap-3">
+            {/* AI Insights Button */}
+            <AISuggestions
+              projectId={projectId}
+              projectName={project.name}
+              onActionClick={handleAIActionClick}
+              onCreateTask={permissions.canEdit ? handleVoiceCreateTask : undefined}
+              useEnhancedAI={true}
+              members={project.members}
+              inline={true}
+            />
+
+            {/* Mobile Add Task FAB */}
+            {permissions.canEdit && (
+              <button
+                onClick={handleCreateTask}
+                className="sm:hidden w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white flex items-center justify-center shadow-lg hover:shadow-xl active:scale-95 transition-all tap-highlight-none"
+                aria-label="Add Task"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
       </div>

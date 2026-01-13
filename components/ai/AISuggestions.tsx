@@ -31,6 +31,8 @@ interface AISuggestionsProps {
   onCreateTask?: (task: VoiceTaskData) => void
   useEnhancedAI?: boolean
   members?: ProjectMember[]
+  /** If true, uses relative positioning (for use inside a flex container). Default: false (fixed positioning) */
+  inline?: boolean
 }
 
 interface Position {
@@ -113,7 +115,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   ),
 }
 
-export function AISuggestions({ projectId, projectName, onActionClick, onCreateTask, useEnhancedAI = true, members = [] }: AISuggestionsProps) {
+export function AISuggestions({ projectId, projectName, onActionClick, onCreateTask, useEnhancedAI = true, members = [], inline = false }: AISuggestionsProps) {
   // ============================================================================
   // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
   // ============================================================================
@@ -451,7 +453,7 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
 
   // Handle drag start (mouse)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isOpen) return // Don't drag when panel is open
+    if (isOpen || inline) return // Don't drag when panel is open or in inline mode
 
     const fabElement = fabRef.current
     if (!fabElement) return
@@ -468,11 +470,11 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
     // Add listeners for drag
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
-  }, [isOpen, handleMouseMove, handleMouseUp])
+  }, [isOpen, inline, handleMouseMove, handleMouseUp])
 
   // Handle drag start (touch)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (isOpen) return
+    if (isOpen || inline) return // Don't drag in inline mode
 
     const fabElement = fabRef.current
     if (!fabElement) return
@@ -487,7 +489,7 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
       posY: rect.top,
     }
     setHasMoved(false)
-  }, [isOpen])
+  }, [isOpen, inline])
 
   // Touch move handler - uses native event for non-passive listener
   const handleTouchMoveNative = useCallback((e: TouchEvent) => {
@@ -626,15 +628,15 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
   return (
     <div
       ref={panelRef}
-      className="fixed z-40"
-      style={{
+      className={inline ? "relative z-40" : "fixed z-40"}
+      style={inline ? undefined : {
         left: positionStyle.left,
         top: positionStyle.top,
         right: positionStyle.right !== 'auto' ? positionStyle.right : undefined,
         bottom: positionStyle.bottom !== 'auto' ? positionStyle.bottom : undefined,
       }}
     >
-      {/* Floating Action Button - Draggable */}
+      {/* Floating Action Button - Draggable (when not inline) */}
       <button
         ref={fabRef}
         onClick={handleClick}
@@ -646,7 +648,9 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
             ? 'scale-110 shadow-2xl cursor-grabbing'
             : isOpen
               ? 'bg-purple-700 cursor-pointer'
-              : 'bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 hover:scale-105 cursor-grab'
+              : inline
+                ? 'bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 hover:scale-105 cursor-pointer'
+                : 'bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 hover:scale-105 cursor-grab'
         } ${!isDragging ? 'transition-all duration-300' : ''}`}
         style={{
           background: isDragging ? 'linear-gradient(to bottom right, #7c3aed, #2563eb)' : undefined,
@@ -686,8 +690,8 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
               </svg>
               <span className="font-semibold text-white text-sm sm:text-base">AI Insights</span>
-              {/* Reset position button */}
-              {position && (
+              {/* Reset position button - only shown when not inline and position is set */}
+              {!inline && position && (
                 <button
                   onClick={handleResetPosition}
                   className="p-1.5 hover:bg-white/20 rounded transition-colors touch-target tap-highlight-none"
