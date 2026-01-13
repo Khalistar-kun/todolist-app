@@ -177,9 +177,14 @@ export function KanbanColumn({
         {!isCollapsed && (
           <div
             ref={setNodeRef}
-            className={`flex-1 p-4 space-y-3 overflow-y-auto min-h-[200px] transition-colors ${
+            className={`flex-1 p-4 space-y-3 overflow-y-auto transition-colors ${
               isOver ? 'bg-gray-50 dark:bg-gray-700/50' : ''
             }`}
+            style={{
+              // Show approximately 3 task cards (each ~110px) + some padding
+              maxHeight: 'calc(3 * 120px + 16px)',
+              minHeight: '200px',
+            }}
           >
             {tasks.length === 0 ? (
               <div className="text-center py-8">
@@ -213,6 +218,18 @@ export function KanbanColumn({
                 ))}
               </SortableContext>
             )}
+          </div>
+        )}
+
+        {/* Scroll indicator when there are more than 3 tasks */}
+        {!isCollapsed && tasks.length > 3 && (
+          <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700/50 bg-gradient-to-t from-white dark:from-gray-800 to-transparent">
+            <div className="flex items-center justify-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+              <svg className="w-3 h-3 animate-bounce" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+              <span>Scroll for {tasks.length - 3} more</span>
+            </div>
           </div>
         )}
 
