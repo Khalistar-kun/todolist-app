@@ -424,10 +424,16 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
       ? `Current quests:\n${visibleSuggestions.map(s => `- ${s.title}: ${s.description}`).join('\n')}`
       : 'No active quests'
 
+    // Include member names for task assignment
+    const membersList = members.length > 0
+      ? `Team members:\n${members.map(m => `- ${m.profile?.full_name || 'Unknown'} (ID: ${m.user_id})`).join('\n')}`
+      : 'No team members'
+
     return `Project: ${projectName || 'Unknown'}
+Project ID: ${projectId}
 ${questsSummary}
-Team size: ${members.length} members`
-  }, [projectName, visibleSuggestions, members.length])
+${membersList}`
+  }, [projectName, projectId, visibleSuggestions, members])
 
   // Send chat message to AI
   const sendChatMessage = useCallback(async () => {
@@ -457,7 +463,17 @@ Guidelines:
 - Be concise and actionable
 - Reference the project context when relevant
 - Suggest practical next steps
-- Help with task planning and prioritization`
+- Help with task planning and prioritization
+
+TASK CREATION:
+When the user asks you to create a task or assign someone to a task, respond with a JSON block in this exact format:
+\`\`\`json
+{"action":"create_task","title":"Task title","description":"Optional description","priority":"medium","assignees":["user_id_here"]}
+\`\`\`
+- Use the team member IDs from the context above for assignees
+- Priority can be: low, medium, high, urgent
+- Always confirm with the user before creating tasks
+- You can assign multiple members by adding multiple IDs to the assignees array`
             },
             ...chatHistory.map(msg => ({ role: msg.role, content: msg.content })),
             { role: 'user', content: userMessage }
@@ -467,7 +483,57 @@ Guidelines:
 
       if (response.ok) {
         const data = await response.json()
-        setChatHistory(prev => [...prev, { role: 'assistant', content: data.response || 'Sorry, I could not process that request.' }])
+        const aiResponse = data.response || 'Sorry, I could not process that request.'
+
+        // Check if the response contains a task creation JSON block
+        const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/)
+        if (jsonMatch) {
+          try {
+            const taskData = JSON.parse(jsonMatch[1])
+            if (taskData.action === 'create_task' && taskData.title) {
+              // Show the response first
+              setChatHistory(prev => [...prev, { role: 'assistant', content: aiResponse }])
+
+              // Create the task via API
+              const createResponse = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  project_id: projectId,
+                  title: taskData.title,
+                  description: taskData.description || '',
+                  priority: taskData.priority || 'medium',
+                  assignees: taskData.assignees || [],
+                }),
+              })
+
+              if (createResponse.ok) {
+                const createdTask = await createResponse.json()
+                const assigneeNames = taskData.assignees?.map((id: string) => {
+                  const member = members.find(m => m.user_id === id)
+                  return member?.profile?.full_name || 'Unknown'
+                }).join(', ')
+
+                toast.success(`Task "${taskData.title}" created${assigneeNames ? ` and assigned to ${assigneeNames}` : ''}!`)
+                setChatHistory(prev => [...prev, {
+                  role: 'assistant',
+                  content: `Done! I've created the task "${taskData.title}"${assigneeNames ? ` and assigned it to ${assigneeNames}` : ''}.`
+                }])
+              } else {
+                const errorData = await createResponse.json().catch(() => ({}))
+                setChatHistory(prev => [...prev, {
+                  role: 'assistant',
+                  content: `Sorry, I couldn't create the task: ${errorData.error || 'Unknown error'}`
+                }])
+              }
+              return
+            }
+          } catch {
+            // JSON parse failed, just show the response normally
+          }
+        }
+
+        setChatHistory(prev => [...prev, { role: 'assistant', content: aiResponse }])
       } else {
         const errorData = await response.json().catch(() => ({}))
         setChatHistory(prev => [...prev, { role: 'assistant', content: errorData.error || 'Sorry, there was an error.' }])
@@ -478,7 +544,7 @@ Guidelines:
     } finally {
       setIsChatLoading(false)
     }
-  }, [chatMessage, chatHistory, isChatLoading, buildChatContext])
+  }, [chatMessage, chatHistory, isChatLoading, buildChatContext, projectId, members])
 
   // Handle chat key press
   const handleChatKeyDown = useCallback((e: React.KeyboardEvent) => {
