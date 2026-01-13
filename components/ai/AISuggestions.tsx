@@ -5,7 +5,9 @@ import { AITaskService, TaskSuggestion } from '@/lib/services/AITaskService'
 
 interface AISuggestionsProps {
   projectId: string
+  projectName?: string
   onActionClick?: (action: TaskSuggestion['action']) => void
+  useEnhancedAI?: boolean
 }
 
 interface Position {
@@ -88,7 +90,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   ),
 }
 
-export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) {
+export function AISuggestions({ projectId, projectName, onActionClick, useEnhancedAI = true }: AISuggestionsProps) {
   // ============================================================================
   // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
   // ============================================================================
@@ -315,14 +317,17 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     }
   }, [position])
 
-  // Fetch suggestions
+  // Fetch suggestions (enhanced with AI if available)
   useEffect(() => {
     let cancelled = false
 
     async function fetchSuggestions() {
       setLoading(true)
       try {
-        const data = await AITaskService.getProjectSuggestions(projectId)
+        // Use enhanced AI insights if enabled and project name is provided
+        const data = useEnhancedAI && projectName
+          ? await AITaskService.getEnhancedInsights(projectId, projectName)
+          : await AITaskService.getProjectSuggestions(projectId)
         if (!cancelled) {
           setSuggestions(data)
         }
@@ -340,7 +345,7 @@ export function AISuggestions({ projectId, onActionClick }: AISuggestionsProps) 
     return () => {
       cancelled = true
     }
-  }, [projectId])
+  }, [projectId, projectName, useEnhancedAI])
 
   // Close panel when clicking outside
   useEffect(() => {

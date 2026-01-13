@@ -1,5 +1,22 @@
 import { supabase } from '@/lib/supabase'
 
+// Flag to check if we should try AI-enhanced insights
+let groqAvailable: boolean | null = null
+
+async function checkGroqAvailable(): Promise<boolean> {
+  if (groqAvailable !== null) return groqAvailable
+  try {
+    const res = await fetch('/api/ai')
+    const data = await res.json()
+    const isAvailable = data.available === true
+    groqAvailable = isAvailable
+    return isAvailable
+  } catch {
+    groqAvailable = false
+    return false
+  }
+}
+
 export interface TaskSuggestion {
   id: string
   type: 'overdue_reminder' | 'workload_balance' | 'dependency_blocker' | 'similar_task' | 'priority_adjustment' | 'deadline_warning'
@@ -422,5 +439,102 @@ export class AITaskService {
       .slice(0, limit)
 
     return similarities
+  }
+
+  /**
+   * Get AI-enhanced project insights using Groq (falls back to rule-based if unavailable)
+   */
+  static async getEnhancedInsights(
+    projectId: string,
+    projectName: string
+  ): Promise<TaskSuggestion[]> {
+    // First get rule-based suggestions as baseline
+    const baseSuggestions = await this.getProjectSuggestions(projectId)
+
+    // Check if Groq is available
+    const aiAvailable = await checkGroqAvailable()
+    if (!aiAvailable) {
+      return baseSuggestions
+    }
+
+    // Get project data for AI analysis
+    const { data: project } = await supabase
+      .from('projects')
+      .select('workflow_stages')
+      .eq('id', projectId)
+      .single()
+
+    const doneStageId = project?.workflow_stages?.find((s: any) =>
+      s.is_done_stage || s.id === 'done'
+    )?.id || 'done'
+
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, status, priority, due_date, stage_id')
+      .eq('project_id', projectId)
+      .neq('stage_id', doneStageId)
+      .limit(50)
+
+    if (!tasks || tasks.length === 0) {
+      return baseSuggestions
+    }
+
+    try {
+      // Call AI API for enhanced insights
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'project-insights',
+          projectName,
+          tasks: tasks.map(t => ({
+            title: t.title,
+            status: t.stage_id,
+            priority: t.priority,
+            due_date: t.due_date,
+          })),
+        }),
+      })
+
+      if (!response.ok) {
+        return baseSuggestions
+      }
+
+      const data = await response.json()
+      const aiInsights = data.insights || []
+
+      // Convert AI insights to TaskSuggestion format
+      const aiSuggestions: TaskSuggestion[] = aiInsights.map((insight: any, index: number) => ({
+        id: `ai-insight-${index}`,
+        type: insight.type === 'risk' ? 'deadline_warning' :
+              insight.type === 'optimization' ? 'priority_adjustment' :
+              insight.type === 'opportunity' ? 'workload_balance' : 'deadline_warning',
+        severity: insight.severity || 'info',
+        title: insight.title,
+        description: insight.description,
+        action: insight.actionable ? {
+          label: 'View Details',
+          type: 'navigate' as const,
+          payload: { filter: 'all' },
+        } : undefined,
+      }))
+
+      // Combine and deduplicate - AI insights first, then rule-based
+      const combined = [...aiSuggestions, ...baseSuggestions]
+
+      // Remove duplicate types (keep AI version if exists)
+      const seen = new Set<string>()
+      const deduped = combined.filter(s => {
+        const key = s.task_id || s.title.slice(0, 30)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      return deduped.slice(0, 10)
+    } catch (error) {
+      console.error('[AITaskService] Error getting AI insights:', error)
+      return baseSuggestions
+    }
   }
 }

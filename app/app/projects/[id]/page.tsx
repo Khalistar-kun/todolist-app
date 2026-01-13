@@ -865,8 +865,13 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {/* AI Insights - Floating Quest Box */}
-            <AISuggestions projectId={projectId} onActionClick={handleAIActionClick} />
+            {/* AI Insights - Floating Quest Box (Enhanced with Groq AI) */}
+            <AISuggestions
+              projectId={projectId}
+              projectName={project.name}
+              onActionClick={handleAIActionClick}
+              useEnhancedAI={true}
+            />
           </div>
         )}
 

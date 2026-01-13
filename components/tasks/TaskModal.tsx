@@ -8,6 +8,9 @@ import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete'
 import { MentionAutocomplete, MentionText } from '@/components/mentions/MentionAutocomplete'
+import { AIAssistButton } from '@/components/ai/AIAssistButton'
+import { AIDescriptionEnhancer } from '@/components/ai/AIDescriptionEnhancer'
+import type { TaskAnalysis } from '@/hooks/useAI'
 
 interface CommentWithUser extends Comment {
   user?: {
@@ -362,6 +365,32 @@ export function TaskModal({
   const totalSubtasks = taskDetails?.subtasks.length || 0
   const subtaskProgress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0
 
+  // Handle AI suggestions
+  const handleApplyAISuggestions = useCallback((suggestions: TaskAnalysis) => {
+    setFormData(prev => ({
+      ...prev,
+      priority: suggestions.suggestedPriority || prev.priority,
+      tags: suggestions.suggestedTags
+        ? [...new Set([...prev.tags, ...suggestions.suggestedTags])]
+        : prev.tags,
+    }))
+    // Store subtasks for later use when task is created
+    if (suggestions.subtasks && suggestions.subtasks.length > 0) {
+      // For new tasks, we'll add subtasks after creation
+      // For existing tasks with details, add them now
+      if (taskDetails) {
+        suggestions.subtasks.forEach(async (subtaskTitle) => {
+          try {
+            await TaskService.createSubtask(taskDetails.id, subtaskTitle)
+          } catch (error) {
+            console.error('Failed to create subtask:', error)
+          }
+        })
+        loadTaskDetails(taskDetails.id)
+      }
+    }
+  }, [taskDetails])
+
   if (!isOpen) return null
 
   return (
@@ -386,11 +415,22 @@ export function TaskModal({
             {/* Left Side - Form */}
             <div className="flex-1 p-4 sm:p-6 overflow-y-auto min-h-0">
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Title */}
+                {/* Title with AI Assist */}
                 <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Task Title {!readOnly && <span className="text-red-500">*</span>}
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Task Title {!readOnly && <span className="text-red-500">*</span>}
+                    </label>
+                    {!readOnly && (
+                      <AIAssistButton
+                        taskTitle={formData.title}
+                        taskDescription={formData.description}
+                        projectName={project.name}
+                        onApplySuggestions={handleApplyAISuggestions}
+                        disabled={!formData.title.trim()}
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     id="title"
@@ -404,11 +444,21 @@ export function TaskModal({
                   />
                 </div>
 
-                {/* Description */}
+                {/* Description with AI Enhancer */}
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Description
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Description
+                    </label>
+                    {!readOnly && (
+                      <AIDescriptionEnhancer
+                        taskTitle={formData.title}
+                        currentDescription={formData.description}
+                        onEnhance={(enhanced) => setFormData({ ...formData, description: enhanced })}
+                        disabled={!formData.title.trim()}
+                      />
+                    )}
+                  </div>
                   <textarea
                     id="description"
                     name="description"
