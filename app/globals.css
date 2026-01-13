@@ -5,6 +5,117 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   LIGHT MODE DESIGN TOKENS
+   ============================================================================ */
+:root {
+  /* Background colors - calm, eye-friendly */
+  --bg-app: #f6f7f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafbfc;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+  --bg-sidebar: #ffffff;
+
+  /* Border colors */
+  --border-subtle: #e5e7eb;
+  --border-default: #d1d5db;
+  --border-strong: #9ca3af;
+
+  /* Text colors - proper hierarchy */
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-placeholder: #9ca3af;
+
+  /* Icon colors */
+  --icon-default: #6b7280;
+  --icon-hover: #111827;
+  --icon-muted: #9ca3af;
+
+  /* Shadows - subtle elevation */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-dropdown: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+
+  /* Priority badge colors - muted, not alarming */
+  --priority-low-bg: #E6F4EA;
+  --priority-low-text: #1E7F4F;
+  --priority-medium-bg: #FFF4E5;
+  --priority-medium-text: #8A5A00;
+  --priority-high-bg: #FDECEC;
+  --priority-high-text: #B42318;
+  --priority-urgent-bg: #FCE8E6;
+  --priority-urgent-text: #8F1D18;
+  --priority-none-bg: #f3f4f6;
+  --priority-none-text: #6b7280;
+
+  /* Status colors */
+  --status-todo-bg: #f3f4f6;
+  --status-todo-text: #4b5563;
+  --status-progress-bg: #dbeafe;
+  --status-progress-text: #1d4ed8;
+  --status-done-bg: #dcfce7;
+  --status-done-text: #15803d;
+
+  /* Accent/interactive colors */
+  --accent-primary: #2563eb;
+  --accent-primary-hover: #1d4ed8;
+  --accent-success: #16a34a;
+  --accent-warning: #d97706;
+  --accent-danger: #dc2626;
+}
+
+/* Dark mode overrides */
+.dark {
+  --bg-app: #111827;
+  --bg-card: #1f2937;
+  --bg-card-hover: #374151;
+  --bg-elevated: #1f2937;
+  --bg-input: #374151;
+  --bg-sidebar: #1f2937;
+
+  --border-subtle: #374151;
+  --border-default: #4b5563;
+  --border-strong: #6b7280;
+
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-placeholder: #6b7280;
+
+  --icon-default: #9ca3af;
+  --icon-hover: #f9fafb;
+  --icon-muted: #6b7280;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 4px 6px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-dropdown: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+
+  --priority-low-bg: rgba(34, 197, 94, 0.2);
+  --priority-low-text: #86efac;
+  --priority-medium-bg: rgba(234, 179, 8, 0.2);
+  --priority-medium-text: #fde047;
+  --priority-high-bg: rgba(239, 68, 68, 0.2);
+  --priority-high-text: #fca5a5;
+  --priority-urgent-bg: rgba(220, 38, 38, 0.3);
+  --priority-urgent-text: #fecaca;
+  --priority-none-bg: #374151;
+  --priority-none-text: #9ca3af;
+
+  --status-todo-bg: #374151;
+  --status-todo-text: #d1d5db;
+  --status-progress-bg: rgba(59, 130, 246, 0.2);
+  --status-progress-text: #93c5fd;
+  --status-done-bg: rgba(34, 197, 94, 0.2);
+  --status-done-text: #86efac;
+
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #60a5fa;
+}
+
 /* Base Styles */
 @layer base {
   html {
@@ -14,9 +125,9 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
-    @apply dark:bg-gray-900 dark:text-gray-100;
-    @apply transition-colors duration-200;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    @apply font-sans transition-colors duration-200;
   }
 
   /* Scrollbar visibility - show on mobile for feedback, hide on desktop until hover */
@@ -66,10 +177,41 @@
 
 /* Component Styles */
 @layer components {
-  /* Card */
+  /* Card - with proper elevation */
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
-    @apply dark:bg-gray-800 dark:border-gray-700;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-card);
+    @apply rounded-xl transition-shadow duration-200;
+  }
+
+  .card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Task card - specific styling */
+  .task-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-card);
+    @apply rounded-lg transition-all duration-200;
+  }
+
+  .task-card:hover {
+    background-color: var(--bg-card-hover);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Elevated components (modals, dropdowns) */
+  .elevated {
+    background-color: var(--bg-elevated);
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .dropdown {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Buttons */
@@ -132,28 +274,70 @@
   }
 
   .badge-gray {
-    @apply bg-gray-100 text-gray-700;
-    @apply dark:bg-gray-700 dark:text-gray-300;
+    background-color: var(--priority-none-bg);
+    color: var(--priority-none-text);
   }
 
   .badge-primary {
-    @apply bg-blue-100 text-blue-700;
-    @apply dark:bg-blue-900/50 dark:text-blue-300;
+    background-color: var(--status-progress-bg);
+    color: var(--status-progress-text);
   }
 
   .badge-success {
-    @apply bg-green-100 text-green-700;
-    @apply dark:bg-green-900/50 dark:text-green-300;
+    background-color: var(--priority-low-bg);
+    color: var(--priority-low-text);
   }
 
   .badge-warning {
-    @apply bg-yellow-100 text-yellow-700;
-    @apply dark:bg-yellow-900/50 dark:text-yellow-300;
+    background-color: var(--priority-medium-bg);
+    color: var(--priority-medium-text);
   }
 
   .badge-error {
-    @apply bg-red-100 text-red-700;
-    @apply dark:bg-red-900/50 dark:text-red-300;
+    background-color: var(--priority-high-bg);
+    color: var(--priority-high-text);
+  }
+
+  /* Priority badges - muted, calming colors */
+  .badge-priority-none {
+    background-color: var(--priority-none-bg);
+    color: var(--priority-none-text);
+  }
+
+  .badge-priority-low {
+    background-color: var(--priority-low-bg);
+    color: var(--priority-low-text);
+  }
+
+  .badge-priority-medium {
+    background-color: var(--priority-medium-bg);
+    color: var(--priority-medium-text);
+  }
+
+  .badge-priority-high {
+    background-color: var(--priority-high-bg);
+    color: var(--priority-high-text);
+  }
+
+  .badge-priority-urgent {
+    background-color: var(--priority-urgent-bg);
+    color: var(--priority-urgent-text);
+  }
+
+  /* Status badges */
+  .badge-status-todo {
+    background-color: var(--status-todo-bg);
+    color: var(--status-todo-text);
+  }
+
+  .badge-status-progress {
+    background-color: var(--status-progress-bg);
+    color: var(--status-progress-text);
+  }
+
+  .badge-status-done {
+    background-color: var(--status-done-bg);
+    color: var(--status-done-text);
   }
 
   /* Stat card */
@@ -162,11 +346,13 @@
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-gray-900 dark:text-white;
+    color: var(--text-primary);
+    @apply text-2xl font-bold;
   }
 
   .stat-label {
-    @apply text-sm text-gray-500 dark:text-gray-400;
+    color: var(--text-muted);
+    @apply text-sm;
   }
 
   /* Page header */
@@ -175,15 +361,44 @@
   }
 
   .page-title {
-    @apply text-2xl font-bold text-gray-900 dark:text-white;
+    color: var(--text-primary);
+    @apply text-2xl font-bold;
   }
 
   .page-description {
-    @apply mt-1 text-gray-500 dark:text-gray-400;
+    color: var(--text-secondary);
+    @apply mt-1;
   }
 
   .section-title {
-    @apply text-base font-semibold text-gray-900 dark:text-white;
+    color: var(--text-primary);
+    @apply text-base font-semibold;
+  }
+
+  /* Text utility classes */
+  .text-primary {
+    color: var(--text-primary);
+  }
+
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-muted {
+    color: var(--text-muted);
+  }
+
+  /* Icon utility classes */
+  .icon-default {
+    color: var(--icon-default);
+  }
+
+  .icon-default:hover {
+    color: var(--icon-hover);
+  }
+
+  .icon-muted {
+    color: var(--icon-muted);
   }
 
   /* Empty state */
@@ -192,22 +407,28 @@
   }
 
   .empty-state-icon {
-    @apply w-12 h-12 text-gray-400 dark:text-gray-500 mb-3;
+    color: var(--icon-muted);
+    @apply w-12 h-12 mb-3;
   }
 
   .empty-state-title {
-    @apply text-sm font-medium text-gray-900 dark:text-white mb-1;
+    color: var(--text-primary);
+    @apply text-sm font-medium mb-1;
   }
 
   .empty-state-description {
-    @apply text-sm text-gray-500 dark:text-gray-400;
+    color: var(--text-muted);
+    @apply text-sm;
   }
 
   /* List item */
   .list-item {
     @apply flex items-center gap-3 px-4 py-3;
-    @apply hover:bg-gray-50 dark:hover:bg-gray-700/50;
     @apply transition-colors cursor-pointer;
+  }
+
+  .list-item:hover {
+    background-color: var(--bg-card-hover);
   }
 
   /* Spinner */

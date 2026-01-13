@@ -73,18 +73,18 @@ export function TaskCard({
     transition,
   }
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityStyles = (priority: string): React.CSSProperties => {
     switch (priority) {
       case 'urgent':
-        return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800'
+        return { backgroundColor: 'var(--priority-urgent-bg)', color: 'var(--priority-urgent-text)', border: 'none' }
       case 'high':
-        return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800'
+        return { backgroundColor: 'var(--priority-high-bg)', color: 'var(--priority-high-text)', border: 'none' }
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800'
+        return { backgroundColor: 'var(--priority-medium-bg)', color: 'var(--priority-medium-text)', border: 'none' }
       case 'low':
-        return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+        return { backgroundColor: 'var(--priority-low-bg)', color: 'var(--priority-low-text)', border: 'none' }
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
+        return { backgroundColor: 'var(--priority-none-bg)', color: 'var(--priority-none-text)', border: 'none' }
     }
   }
 
@@ -236,16 +236,23 @@ export function TaskCard({
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{
+        ...style,
+        backgroundColor: 'var(--bg-card)',
+        border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+        boxShadow: 'var(--shadow-card)',
+      }}
       data-task-card="true"
       data-sortable="true"
-      className={`relative bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer hover:shadow-md dark:hover:shadow-gray-900/50 transition-all duration-200 group overflow-hidden touch-none sm:touch-auto ${
+      className={`relative rounded-lg p-4 cursor-pointer transition-all duration-200 group overflow-hidden touch-none sm:touch-auto ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
         isSelected
-          ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-500/30 dark:ring-blue-400/30 bg-blue-50/50 dark:bg-blue-900/20'
-          : 'border-gray-200 dark:border-gray-700'
+          ? 'ring-2 ring-blue-500/30 dark:ring-blue-400/30'
+          : ''
       }`}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-card-hover)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-card)' }}
       onClick={handleCardClick}
       {...attributes}
       {...listeners}
@@ -272,16 +279,18 @@ export function TaskCard({
         <div className="flex-1 flex flex-wrap gap-1">
           {task.priority !== 'none' && (
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getPriorityColor(
-                task.priority
-              )}`}
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+              style={getPriorityStyles(task.priority)}
             >
               {getPriorityLabel(task.priority)}
             </span>
           )}
           {/* Approval Status Badge */}
           {task.stage_id === doneStageId && task.approval_status === 'pending' && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+              style={{ backgroundColor: 'var(--priority-medium-bg)', color: 'var(--priority-medium-text)' }}
+            >
               <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -289,7 +298,10 @@ export function TaskCard({
             </span>
           )}
           {task.approval_status === 'approved' && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800">
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+              style={{ backgroundColor: 'var(--priority-low-bg)', color: 'var(--priority-low-text)' }}
+            >
               <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -304,7 +316,10 @@ export function TaskCard({
           {onDelete && (
             <button
               onClick={handleDelete}
-              className="touch-target p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors tap-highlight-none"
+              className="touch-target p-2 rounded transition-colors tap-highlight-none"
+              style={{ color: 'var(--icon-default)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--priority-high-bg)'; e.currentTarget.style.color = 'var(--priority-high-text)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--icon-default)' }}
               title="Delete task"
               aria-label="Delete task"
             >
@@ -317,7 +332,10 @@ export function TaskCard({
           {/* More menu button */}
           <button
             ref={menuButtonRef}
-            className="touch-target p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors tap-highlight-none"
+            className="touch-target p-2 rounded transition-colors tap-highlight-none"
+            style={{ color: 'var(--icon-default)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'; e.currentTarget.style.color = 'var(--icon-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--icon-default)' }}
             onClick={handleMenuClick}
             onKeyDown={(e) => handleIconKeyDown(e, () => setMenuOpen(!menuOpen))}
             title="More options"
@@ -332,7 +350,8 @@ export function TaskCard({
           {menuOpen && (
             <div
               ref={menuRef}
-              className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+              className="absolute right-0 top-full mt-1 w-56 rounded-lg py-1 z-50"
+              style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-dropdown)' }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Edit Task */}
@@ -343,9 +362,12 @@ export function TaskCard({
                   setMenuOpen(false)
                   onClick()
                 }}
-                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 tap-highlight-none touch-target"
+                className="w-full px-4 py-3 text-left text-sm flex items-center gap-2 tap-highlight-none touch-target transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <svg className="w-4 h-4" style={{ color: 'var(--icon-default)' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
                 Edit Task
@@ -354,8 +376,8 @@ export function TaskCard({
               {/* Color Picker - inline in menu for better UX */}
               {onColorChange && (
                 <>
-                  <div className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <div className="px-4 py-2 text-left text-sm flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                    <svg className="w-4 h-4" style={{ color: 'var(--icon-default)' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z" />
                     </svg>
                     Color
@@ -373,14 +395,17 @@ export function TaskCard({
                           className={`w-8 h-8 rounded-full border-2 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 tap-highlight-none flex items-center justify-center ${
                             task.color === color.value
                               ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                              : 'border-gray-300 dark:border-gray-600'
-                          } ${color.value === null ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
-                          style={color.value ? { backgroundColor: color.value } : undefined}
+                              : ''
+                          }`}
+                          style={{
+                            backgroundColor: color.value || 'var(--bg-card-hover)',
+                            borderColor: task.color === color.value ? 'var(--accent-primary)' : 'var(--border-default)'
+                          }}
                           title={color.label}
                           aria-label={`Set color to ${color.label}`}
                         >
                           {color.value === null && (
-                            <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <svg className="w-5 h-5" style={{ color: 'var(--icon-muted)' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                             </svg>
                           )}
@@ -393,7 +418,7 @@ export function TaskCard({
                       ))}
                     </div>
                   </div>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  <div className="my-1" style={{ borderTop: '1px solid var(--border-subtle)' }} />
                 </>
               )}
 
@@ -401,9 +426,12 @@ export function TaskCard({
               {onDuplicate && (
                 <button
                   onClick={handleDuplicate}
-                  className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 tap-highlight-none touch-target"
+                  className="w-full px-4 py-3 text-left text-sm flex items-center gap-2 tap-highlight-none touch-target transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <svg className="w-4 h-4" style={{ color: 'var(--icon-default)' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
                   </svg>
                   Duplicate
@@ -411,13 +439,16 @@ export function TaskCard({
               )}
 
               {/* Divider */}
-              {onDelete && <div className="border-t border-gray-200 dark:border-gray-700 my-1" />}
+              {onDelete && <div className="my-1" style={{ borderTop: '1px solid var(--border-subtle)' }} />}
 
               {/* Delete */}
               {onDelete && (
                 <button
                   onClick={handleDelete}
-                  className="w-full px-4 py-3 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 tap-highlight-none touch-target"
+                  className="w-full px-4 py-3 text-left text-sm flex items-center gap-2 tap-highlight-none touch-target transition-colors"
+                  style={{ color: 'var(--priority-high-text)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--priority-high-bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -431,13 +462,13 @@ export function TaskCard({
       </div>
 
       {/* Task Title */}
-      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2 line-clamp-2">
+      <h4 className="text-sm font-medium mb-2 line-clamp-2" style={{ color: 'var(--text-primary)' }}>
         {task.title}
       </h4>
 
       {/* Task Description */}
       {task.description && (
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+        <p className="text-xs mb-3 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
           {task.description}
         </p>
       )}
@@ -448,13 +479,14 @@ export function TaskCard({
           {task.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+              style={{ backgroundColor: 'var(--status-progress-bg)', color: 'var(--status-progress-text)' }}
             >
               {tag}
             </span>
           ))}
           {task.tags.length > 3 && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">+{task.tags.length - 3}</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>+{task.tags.length - 3}</span>
           )}
         </div>
       )}
@@ -534,9 +566,10 @@ export function TaskCard({
         {/* Due Date */}
         {task.due_date && (
           <div
-            className={`flex items-center text-xs ${
-              isOverdue ? 'text-red-600 dark:text-red-400' : isDueSoon ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'
-            }`}
+            className="flex items-center text-xs"
+            style={{
+              color: isOverdue ? 'var(--priority-high-text)' : isDueSoon ? 'var(--priority-medium-text)' : 'var(--text-muted)'
+            }}
           >
             <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -557,7 +590,10 @@ export function TaskCard({
                 onCommentClick?.(task, rect)
               }
             })}
-            className="flex items-center gap-1 px-2 py-2 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors tap-highlight-none touch-target"
+            className="flex items-center gap-1 px-2 py-2 text-xs rounded transition-colors tap-highlight-none touch-target"
+            style={{ color: 'var(--icon-default)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--status-progress-bg)'; e.currentTarget.style.color = 'var(--status-progress-text)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--icon-default)' }}
             title="View comments"
             aria-label={`${commentsCount} comment${commentsCount !== 1 ? 's' : ''}`}
           >
@@ -573,7 +609,10 @@ export function TaskCard({
           <button
             onClick={handleExpandClick}
             onKeyDown={(e) => handleIconKeyDown(e, () => onExpandClick?.(task) || onClick())}
-            className="flex items-center justify-center touch-target p-2 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors tap-highlight-none"
+            className="flex items-center justify-center touch-target p-2 rounded transition-colors tap-highlight-none"
+            style={{ color: 'var(--icon-default)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'; e.currentTarget.style.color = 'var(--icon-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--icon-default)' }}
             title="View task details"
             aria-label="Expand task"
           >
@@ -588,7 +627,8 @@ export function TaskCard({
               {task.assignees.slice(0, 3).map((assignee) => (
                 <div
                   key={assignee.id}
-                  className="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 border-2 border-white dark:border-gray-800 flex items-center justify-center overflow-hidden"
+                  className="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden"
+                  style={{ backgroundColor: 'var(--bg-card-hover)', border: '2px solid var(--bg-card)' }}
                   title={assignee.full_name || 'Unassigned'}
                 >
                   {assignee.avatar_url ? (
@@ -598,15 +638,18 @@ export function TaskCard({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                       {(assignee.full_name || 'U')[0].toUpperCase()}
                     </span>
                   )}
                 </div>
               ))}
               {task.assignees.length > 3 && (
-                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-800 flex items-center justify-center">
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--bg-card-hover)', border: '2px solid var(--bg-card)' }}
+                >
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                     +{task.assignees.length - 3}
                   </span>
                 </div>
@@ -626,20 +669,21 @@ export function TaskCard({
           }}
         >
           <div
-            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl sm:rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            className="w-full max-w-sm rounded-2xl sm:rounded-xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            style={{ backgroundColor: 'var(--bg-elevated)', boxShadow: 'var(--shadow-dropdown)' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="px-6 pt-6 pb-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--priority-high-bg)' }}>
+                  <svg className="w-5 h-5" style={{ color: 'var(--priority-high-text)' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Task</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Delete Task</h3>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Are you sure you want to delete &quot;{task.title.length > 40 ? task.title.substring(0, 40) + '...' : task.title}&quot;? This action cannot be undone.
               </p>
             </div>
@@ -651,7 +695,8 @@ export function TaskCard({
                   e.stopPropagation()
                   cancelDelete()
                 }}
-                className="flex-1 px-4 py-3 sm:py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl sm:rounded-lg transition-colors tap-highlight-none active:scale-[0.98]"
+                className="flex-1 px-4 py-3 sm:py-2.5 text-sm font-medium rounded-xl sm:rounded-lg transition-colors tap-highlight-none active:scale-[0.98]"
+                style={{ backgroundColor: 'var(--bg-card-hover)', color: 'var(--text-secondary)' }}
               >
                 Cancel
               </button>
@@ -660,7 +705,8 @@ export function TaskCard({
                   e.stopPropagation()
                   confirmDelete()
                 }}
-                className="flex-1 px-4 py-3 sm:py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-xl sm:rounded-lg transition-colors tap-highlight-none active:scale-[0.98]"
+                className="flex-1 px-4 py-3 sm:py-2.5 text-sm font-medium text-white rounded-xl sm:rounded-lg transition-colors tap-highlight-none active:scale-[0.98]"
+                style={{ backgroundColor: 'var(--accent-danger)' }}
               >
                 Delete Task
               </button>
