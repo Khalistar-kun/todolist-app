@@ -323,8 +323,14 @@ export default function ProjectPage() {
     handleModalClose()
   }
 
-  // Handler for voice command task creation
-  const handleVoiceCreateTask = useCallback(async (taskData: { title: string; description?: string; priority?: string }) => {
+  // Handler for voice command task creation (supports extended data from wizard)
+  const handleVoiceCreateTask = useCallback(async (taskData: {
+    title: string
+    description?: string
+    priority?: 'low' | 'medium' | 'high' | 'urgent'
+    due_date?: string
+    assignee_ids?: string[]
+  }) => {
     if (!permissions.canEdit) {
       toast.error('You do not have permission to create tasks')
       return
@@ -340,8 +346,10 @@ export default function ProjectPage() {
         project_id: projectId,
         title: taskData.title,
         description: taskData.description,
-        priority: (taskData.priority as 'none' | 'low' | 'medium' | 'high' | 'urgent') || 'none',
+        priority: taskData.priority || 'none',
         stage_id: firstStage,
+        due_date: taskData.due_date,
+        assignees: taskData.assignee_ids,
       })
 
       // Refresh tasks list
@@ -353,7 +361,7 @@ export default function ProjectPage() {
 
   // Handler for deleting a task from the card menu
   const handleTaskDelete = async (task: Task) => {
-    if (!permissions.canEdit) {
+    if (!permissions.canDelete) {
       toast.error('You do not have permission to delete tasks')
       return
     }
@@ -872,7 +880,7 @@ export default function ProjectPage() {
               onReorder={permissions.canEdit ? handleReorder : undefined}
               onBulkStatusChange={permissions.canEdit ? handleBulkStatusChange : undefined}
               onAddTask={permissions.canEdit ? handleAddTaskFromColumn : undefined}
-              onTaskDelete={permissions.canEdit ? handleTaskDelete : undefined}
+              onTaskDelete={permissions.canDelete ? handleTaskDelete : undefined}
               onTaskDuplicate={permissions.canEdit ? handleTaskDuplicate : undefined}
               onTaskColorChange={permissions.canEdit ? handleTaskColorChange : undefined}
               onTaskApprove={permissions.canManageMembers ? handleTaskApprove : undefined}
@@ -900,6 +908,7 @@ export default function ProjectPage() {
               onActionClick={handleAIActionClick}
               onCreateTask={permissions.canEdit ? handleVoiceCreateTask : undefined}
               useEnhancedAI={true}
+              members={project.members}
             />
           </div>
         )}

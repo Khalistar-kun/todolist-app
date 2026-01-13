@@ -5,12 +5,32 @@ import { AITaskService, TaskSuggestion } from '@/lib/services/AITaskService'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import toast from 'react-hot-toast'
 
+interface ProjectMember {
+  id: string
+  user_id: string
+  profile?: {
+    full_name?: string
+    avatar_url?: string
+  }
+}
+
+interface VoiceTaskData {
+  title: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  due_date?: string
+  assignee_ids?: string[]
+}
+
+type VoiceWizardStep = 'idle' | 'title' | 'description' | 'priority' | 'due_date' | 'assignees' | 'confirm'
+
 interface AISuggestionsProps {
   projectId: string
   projectName?: string
   onActionClick?: (action: TaskSuggestion['action']) => void
-  onCreateTask?: (task: { title: string; description?: string; priority?: string }) => void
+  onCreateTask?: (task: VoiceTaskData) => void
   useEnhancedAI?: boolean
+  members?: ProjectMember[]
 }
 
 interface Position {
@@ -93,7 +113,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   ),
 }
 
-export function AISuggestions({ projectId, projectName, onActionClick, onCreateTask, useEnhancedAI = true }: AISuggestionsProps) {
+export function AISuggestions({ projectId, projectName, onActionClick, onCreateTask, useEnhancedAI = true, members = [] }: AISuggestionsProps) {
   // ============================================================================
   // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
   // ============================================================================
@@ -104,9 +124,12 @@ export function AISuggestions({ projectId, projectName, onActionClick, onCreateT
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // Voice input state
+  // Voice wizard state
+  const [wizardStep, setWizardStep] = useState<VoiceWizardStep>('idle')
+  const [taskData, setTaskData] = useState<VoiceTaskData>({ title: '' })
   const [isProcessingVoice, setIsProcessingVoice] = useState(false)
   const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
 
   // Drag state
   const [position, setPosition] = useState<Position | null>(null)
@@ -187,18 +210,25 @@ export function AISuggestions({ projectId, projectName, onActionClick, onCreateT
     setDismissed(prev => new Set([...prev, id]))
   }, [])
 
-  // Voice input result handler
-  const handleVoiceResult = useCallback(async (result: { transcript: string; isFinal: boolean }) => {
-    if (!result.isFinal) return
+  // Wizard step prompts
+  const STEP_PROMPTS: Record<VoiceWizardStep, string> = {
+    idle: 'Tap mic to start creating a task',
+    title: 'What is the task title?',
+    description: 'Add a description (or say "skip")',
+    priority: 'Priority? (low, medium, high, urgent, or skip)',
+    due_date: 'When is it due? (e.g., "tomorrow", "next Friday", or "skip")',
+    assignees: 'Who should be assigned? (say name or "skip")',
+    confirm: 'Review and confirm your task',
+  }
 
-    const text = result.transcript.trim()
-    if (!text) return
-
-    setVoiceTranscript(text)
-    setIsProcessingVoice(true)
+  // Parse date from voice input
+  const parseDateFromVoice = useCallback(async (text: string): Promise<string | undefined> => {
+    const lowerText = text.toLowerCase()
+    if (lowerText === 'skip' || lowerText === 'no' || lowerText === 'none') {
+      return undefined
+    }
 
     try {
-      // Use AI to parse the voice command
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -207,71 +237,152 @@ export function AISuggestions({ projectId, projectName, onActionClick, onCreateT
           messages: [
             {
               role: 'system',
-              content: `You are a task parser. Extract task information from voice commands.
-Return a JSON object with:
-- title: the main task title (required)
-- description: additional details if mentioned (optional)
-- priority: "low", "medium", "high", or "urgent" if mentioned (optional)
-
+              content: `Convert the time reference to an ISO date string (YYYY-MM-DD format). Today is ${new Date().toISOString().split('T')[0]}.
 Examples:
-- "Create a task to review the quarterly report by tomorrow" -> {"title": "Review the quarterly report"}
-- "Add high priority task fix the login bug" -> {"title": "Fix the login bug", "priority": "high"}
-- "New task implement user dashboard with charts and analytics" -> {"title": "Implement user dashboard", "description": "Include charts and analytics"}
-
-Only return valid JSON, nothing else.`
+- "tomorrow" -> "${new Date(Date.now() + 86400000).toISOString().split('T')[0]}"
+- "next week" -> "${new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]}"
+- "in 3 days" -> "${new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]}"
+Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the date, return "INVALID".`
             },
-            {
-              role: 'user',
-              content: text
-            }
+            { role: 'user', content: text }
           ]
         }),
       })
 
       if (response.ok) {
         const data = await response.json()
-        try {
-          const jsonMatch = data.response.match(/\{[\s\S]*\}/)
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0])
-            if (parsed.title && onCreateTask) {
-              onCreateTask({
-                title: parsed.title,
-                description: parsed.description,
-                priority: parsed.priority,
-              })
-              toast.success(`Task created: ${parsed.title}`)
-              setVoiceTranscript('')
-            }
-          }
-        } catch {
-          // If parsing fails, use the raw transcript as title
-          if (onCreateTask) {
-            onCreateTask({ title: text })
-            toast.success(`Task created: ${text}`)
-            setVoiceTranscript('')
-          }
-        }
-      } else {
-        // Fallback: create task with raw transcript
-        if (onCreateTask) {
-          onCreateTask({ title: text })
-          toast.success(`Task created: ${text}`)
-          setVoiceTranscript('')
+        const dateStr = data.response?.trim()
+        if (dateStr && dateStr !== 'INVALID' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          return dateStr
         }
       }
     } catch (error) {
-      console.error('[VoiceInput] AI processing error:', error)
-      // Fallback: create task with raw transcript
-      if (onCreateTask) {
-        onCreateTask({ title: text })
-        toast.success(`Task created: ${text}`)
-        setVoiceTranscript('')
-      }
-    } finally {
-      setIsProcessingVoice(false)
+      console.error('[VoiceInput] Date parsing error:', error)
     }
-  }, [onCreateTask])
+    return undefined
+  }, [])
+
+  // Find member by name
+  const findMemberByName = useCallback((name: string): ProjectMember | undefined => {
+    const lowerName = name.toLowerCase()
+    return members.find(m =>
+      m.profile?.full_name?.toLowerCase().includes(lowerName)
+    )
+  }, [members])
+
+  // Process voice input based on current wizard step
+  const processWizardStep = useCallback(async (text: string) => {
+    const lowerText = text.toLowerCase().trim()
+    const isSkip = lowerText === 'skip' || lowerText === 'no' || lowerText === 'none' || lowerText === 'next'
+
+    switch (wizardStep) {
+      case 'title':
+        setTaskData(prev => ({ ...prev, title: text }))
+        setWizardStep('description')
+        toast.success(`Title: "${text}"`)
+        break
+
+      case 'description':
+        if (!isSkip) {
+          setTaskData(prev => ({ ...prev, description: text }))
+          toast.success('Description added')
+        }
+        setWizardStep('priority')
+        break
+
+      case 'priority':
+        if (!isSkip) {
+          const priorityMap: Record<string, 'low' | 'medium' | 'high' | 'urgent'> = {
+            'low': 'low',
+            'medium': 'medium',
+            'high': 'high',
+            'urgent': 'urgent',
+            'critical': 'urgent',
+          }
+          const priority = priorityMap[lowerText] || 'medium'
+          setTaskData(prev => ({ ...prev, priority }))
+          toast.success(`Priority: ${priority}`)
+        }
+        setWizardStep('due_date')
+        break
+
+      case 'due_date':
+        if (!isSkip) {
+          setIsProcessingVoice(true)
+          const dueDate = await parseDateFromVoice(text)
+          setIsProcessingVoice(false)
+          if (dueDate) {
+            setTaskData(prev => ({ ...prev, due_date: dueDate }))
+            toast.success(`Due: ${dueDate}`)
+          }
+        }
+        if (members.length > 0) {
+          setWizardStep('assignees')
+        } else {
+          setWizardStep('confirm')
+        }
+        break
+
+      case 'assignees':
+        if (!isSkip) {
+          const member = findMemberByName(text)
+          if (member) {
+            setSelectedAssignees(prev => [...prev, member.user_id])
+            setTaskData(prev => ({
+              ...prev,
+              assignee_ids: [...(prev.assignee_ids || []), member.user_id]
+            }))
+            toast.success(`Assigned to: ${member.profile?.full_name || 'team member'}`)
+          } else {
+            toast.error(`Member "${text}" not found`)
+          }
+        }
+        setWizardStep('confirm')
+        break
+
+      default:
+        break
+    }
+  }, [wizardStep, parseDateFromVoice, findMemberByName, members.length])
+
+  // Voice input result handler
+  const handleVoiceResult = useCallback(async (result: { transcript: string; isFinal: boolean }) => {
+    if (!result.isFinal) return
+
+    const text = result.transcript.trim()
+    if (!text) return
+
+    setVoiceTranscript(text)
+
+    if (wizardStep !== 'idle' && wizardStep !== 'confirm') {
+      await processWizardStep(text)
+    }
+  }, [wizardStep, processWizardStep])
+
+  // Start the wizard
+  const startWizard = useCallback(() => {
+    setTaskData({ title: '' })
+    setSelectedAssignees([])
+    setVoiceTranscript('')
+    setWizardStep('title')
+  }, [])
+
+  // Cancel wizard
+  const cancelWizard = useCallback(() => {
+    setWizardStep('idle')
+    setTaskData({ title: '' })
+    setSelectedAssignees([])
+    setVoiceTranscript('')
+  }, [])
+
+  // Confirm and create task
+  const confirmTask = useCallback(() => {
+    if (onCreateTask && taskData.title) {
+      onCreateTask(taskData)
+      toast.success(`Task created: ${taskData.title}`)
+      cancelWizard()
+    }
+  }, [onCreateTask, taskData, cancelWizard])
 
   // Voice input error handler
   const handleVoiceError = useCallback((error: string) => {
@@ -593,63 +704,174 @@ Only return valid JSON, nothing else.`
             </div>
           </div>
 
-          {/* Voice Input Section */}
+          {/* Voice Input Section with Wizard */}
           {isVoiceSupported && onCreateTask && (
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={isProcessingVoice}
-                  className={`relative flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                    isListening
-                      ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/30'
-                      : isProcessingVoice
-                        ? 'bg-purple-100 dark:bg-purple-900/30 cursor-wait'
-                        : 'bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50'
-                  }`}
-                  title={isListening ? 'Stop listening' : 'Speak to create task'}
-                >
-                  {isProcessingVoice ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-300 border-t-purple-600" />
-                  ) : isListening ? (
-                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
-                    </svg>
-                  ) : (
-                    <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                    </svg>
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  {isListening ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                        </span>
-                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Listening...</span>
-                      </div>
-                      {liveTranscript && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{liveTranscript}</p>
-                      )}
-                    </div>
-                  ) : isProcessingVoice ? (
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Creating task...</span>
-                      {voiceTranscript && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{voiceTranscript}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-0.5">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Command</span>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Tap mic and say: &quot;Create task to...&quot;</p>
-                    </div>
-                  )}
+              {/* Wizard Progress */}
+              {wizardStep !== 'idle' && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
+                      Step {['title', 'description', 'priority', 'due_date', 'assignees', 'confirm'].indexOf(wizardStep) + 1} of {members.length > 0 ? 6 : 5}
+                    </span>
+                    <button
+                      onClick={cancelWizard}
+                      className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <div className="flex gap-1">
+                    {['title', 'description', 'priority', 'due_date', ...(members.length > 0 ? ['assignees'] : []), 'confirm'].map((step, i) => (
+                      <div
+                        key={step}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          ['title', 'description', 'priority', 'due_date', 'assignees', 'confirm'].indexOf(wizardStep) >= i
+                            ? 'bg-purple-500'
+                            : 'bg-gray-200 dark:bg-gray-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Confirm Step UI */}
+              {wizardStep === 'confirm' ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
+                    <div>
+                      <span className="text-xs text-gray-500">Title</span>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{taskData.title}</p>
+                    </div>
+                    {taskData.description && (
+                      <div>
+                        <span className="text-xs text-gray-500">Description</span>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{taskData.description}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-4">
+                      {taskData.priority && (
+                        <div>
+                          <span className="text-xs text-gray-500">Priority</span>
+                          <p className={`text-sm font-medium ${
+                            taskData.priority === 'urgent' ? 'text-red-600' :
+                            taskData.priority === 'high' ? 'text-orange-600' :
+                            taskData.priority === 'medium' ? 'text-yellow-600' :
+                            'text-green-600'
+                          }`}>{taskData.priority}</p>
+                        </div>
+                      )}
+                      {taskData.due_date && (
+                        <div>
+                          <span className="text-xs text-gray-500">Due Date</span>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{taskData.due_date}</p>
+                        </div>
+                      )}
+                    </div>
+                    {selectedAssignees.length > 0 && (
+                      <div>
+                        <span className="text-xs text-gray-500">Assigned to</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {selectedAssignees.map(userId => {
+                            const member = members.find(m => m.user_id === userId)
+                            return (
+                              <span key={userId} className="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">
+                                {member?.profile?.full_name || 'Unknown'}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={cancelWizard}
+                      className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmTask}
+                      className="flex-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                    >
+                      Create Task
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Voice Input UI */
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (wizardStep === 'idle') {
+                        startWizard()
+                        setTimeout(() => startListening(), 100)
+                      } else if (isListening) {
+                        stopListening()
+                      } else {
+                        startListening()
+                      }
+                    }}
+                    disabled={isProcessingVoice}
+                    className={`relative flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                      isListening
+                        ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/30'
+                        : isProcessingVoice
+                          ? 'bg-purple-100 dark:bg-purple-900/30 cursor-wait'
+                          : 'bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50'
+                    }`}
+                    title={isListening ? 'Stop listening' : wizardStep === 'idle' ? 'Start creating task' : 'Speak your answer'}
+                  >
+                    {isProcessingVoice ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-300 border-t-purple-600" />
+                    ) : isListening ? (
+                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    {isListening ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                          </span>
+                          <span className="text-sm font-medium text-red-600 dark:text-red-400">Listening...</span>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{STEP_PROMPTS[wizardStep]}</p>
+                        {liveTranscript && (
+                          <p className="text-sm text-gray-800 dark:text-gray-200 truncate">&quot;{liveTranscript}&quot;</p>
+                        )}
+                      </div>
+                    ) : isProcessingVoice ? (
+                      <div className="space-y-1">
+                        <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Processing...</span>
+                        {voiceTranscript && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{voiceTranscript}</p>
+                        )}
+                      </div>
+                    ) : wizardStep !== 'idle' ? (
+                      <div className="space-y-0.5">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{STEP_PROMPTS[wizardStep]}</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Tap mic to answer or say &quot;skip&quot;</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Task Creator</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Tap mic to create a task step by step</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
