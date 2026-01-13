@@ -9,18 +9,20 @@
    LIGHT MODE DESIGN TOKENS
    ============================================================================ */
 :root {
-  /* Background colors - calm, eye-friendly */
-  --bg-app: #f6f7f9;
+  /* Background colors - with gray tones for depth */
+  --bg-app: #f0f1f3;
   --bg-card: #ffffff;
-  --bg-card-hover: #fafbfc;
+  --bg-card-hover: #f5f6f8;
   --bg-elevated: #ffffff;
-  --bg-input: #ffffff;
-  --bg-sidebar: #ffffff;
+  --bg-input: #f9fafb;
+  --bg-sidebar: #f5f6f8;
+  --bg-section: #f3f4f6;
+  --bg-header: #e5e7eb;
 
-  /* Border colors - more visible */
-  --border-subtle: #d1d5db;
-  --border-default: #9ca3af;
-  --border-strong: #6b7280;
+  /* Border colors - darker for visibility */
+  --border-subtle: #9ca3af;
+  --border-default: #6b7280;
+  --border-strong: #4b5563;
 
   /* Text colors - improved contrast for readability */
   --text-primary: #111827;
@@ -75,6 +77,8 @@
   --bg-elevated: #1f2937;
   --bg-input: #374151;
   --bg-sidebar: #1f2937;
+  --bg-section: #1a202c;
+  --bg-header: #111827;
 
   --border-subtle: #374151;
   --border-default: #4b5563;

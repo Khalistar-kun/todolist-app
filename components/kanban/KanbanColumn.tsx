@@ -84,7 +84,7 @@ export function KanbanColumn({
     <div className="flex-shrink-0 w-[80vw] sm:w-80 snap-start sm:snap-align-none">
       <div className="card h-full flex flex-col" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-card)' }}>
         {/* Column Header */}
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="px-4 py-3" style={{ backgroundColor: 'var(--bg-section)', borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div
@@ -236,7 +236,7 @@ export function KanbanColumn({
 
         {/* Scroll indicator when there are more than 3 tasks */}
         {!isCollapsed && tasks.length > 3 && (
-          <div className="px-4 py-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <div className="px-4 py-2" style={{ backgroundColor: 'var(--bg-section)', borderTop: '1px solid var(--border-subtle)' }}>
             <div className="flex items-center justify-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
               <svg className="w-3 h-3 animate-bounce" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -270,7 +270,7 @@ export function KanbanColumn({
 
         {/* Add Task Button - Hidden when collapsed */}
         {!isCollapsed && (
-          <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <div className="px-4 py-3" style={{ backgroundColor: 'var(--bg-section)', borderTop: '1px solid var(--border-subtle)' }}>
             <button
               onClick={() => onAddTask?.(stage.id)}
               className="w-full touch-target flex items-center justify-center px-3 py-3 text-sm rounded-md transition-colors tap-highlight-none press-scale"
