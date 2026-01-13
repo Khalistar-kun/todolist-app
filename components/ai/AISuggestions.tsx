@@ -140,6 +140,14 @@ export function AISuggestions({ projectId, projectName, onActionClick, onCreateT
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null)
   const fabRef = useRef<HTMLButtonElement>(null)
 
+  // Chat state
+  const [activeTab, setActiveTab] = useState<'quests' | 'chat'>('quests')
+  const [chatMessage, setChatMessage] = useState('')
+  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([])
+  const [isChatLoading, setIsChatLoading] = useState(false)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+
   // ============================================================================
   // MEMOIZED VALUES (also hooks, must be unconditional)
   // ============================================================================
@@ -410,6 +418,76 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
     localStorage.removeItem(POSITION_STORAGE_KEY)
   }, [])
 
+  // Build context string for AI chat
+  const buildChatContext = useCallback(() => {
+    const questsSummary = visibleSuggestions.length > 0
+      ? `Current quests:\n${visibleSuggestions.map(s => `- ${s.title}: ${s.description}`).join('\n')}`
+      : 'No active quests'
+
+    return `Project: ${projectName || 'Unknown'}
+${questsSummary}
+Team size: ${members.length} members`
+  }, [projectName, visibleSuggestions, members.length])
+
+  // Send chat message to AI
+  const sendChatMessage = useCallback(async () => {
+    if (!chatMessage.trim() || isChatLoading) return
+
+    const userMessage = chatMessage.trim()
+    setChatMessage('')
+    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }])
+    setIsChatLoading(true)
+
+    const context = buildChatContext()
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'chat',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a helpful AI assistant for a project management app. You're helping the user with their project.
+
+${context}
+
+Guidelines:
+- Be concise and actionable
+- Reference the project context when relevant
+- Suggest practical next steps
+- Help with task planning and prioritization`
+            },
+            ...chatHistory.map(msg => ({ role: msg.role, content: msg.content })),
+            { role: 'user', content: userMessage }
+          ]
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setChatHistory(prev => [...prev, { role: 'assistant', content: data.response || 'Sorry, I could not process that request.' }])
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setChatHistory(prev => [...prev, { role: 'assistant', content: errorData.error || 'Sorry, there was an error.' }])
+      }
+    } catch (error) {
+      console.error('Chat error:', error)
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }])
+    } finally {
+      setIsChatLoading(false)
+    }
+  }, [chatMessage, chatHistory, isChatLoading, buildChatContext])
+
+  // Handle chat key press
+  const handleChatKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendChatMessage()
+    }
+  }, [sendChatMessage])
+
   // Handle click - only toggle if we haven't moved
   const handleClick = useCallback(() => {
     if (!hasMoved) {
@@ -610,14 +688,25 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
     }
   }, [isOpen])
 
+  // Scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatContainerRef.current && activeTab === 'chat') {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [chatHistory, activeTab])
+
+  // Focus chat input when switching to chat tab
+  useEffect(() => {
+    if (activeTab === 'chat' && isOpen && chatInputRef.current) {
+      setTimeout(() => chatInputRef.current?.focus(), 100)
+    }
+  }, [activeTab, isOpen])
+
   // ============================================================================
   // EARLY RETURNS - ONLY AFTER ALL HOOKS
   // ============================================================================
 
-  // Don't render if no suggestions and not loading
-  if (!loading && visibleSuggestions.length === 0) {
-    return null
-  }
+  // Component is now always rendered (chat tab doesn't require suggestions)
 
   // ============================================================================
   // RENDER
@@ -683,18 +772,51 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
       {/* Quest Panel - Mobile optimized */}
       {isOpen && (
         <div className={`absolute ${getPanelPosition()} w-[calc(100vw-32px)] sm:w-96 max-w-[380px] max-h-[75vh] sm:max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-scale-in`}>
-          {/* Header */}
+          {/* Header with Tabs */}
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-3 sm:px-4 py-2.5 sm:py-3">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
-              </svg>
-              <span className="font-semibold text-white text-sm sm:text-base">Quests</span>
+              {/* Tab Buttons */}
+              <div className="flex bg-white/20 rounded-lg p-0.5">
+                <button
+                  onClick={() => setActiveTab('quests')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                    activeTab === 'quests'
+                      ? 'bg-white text-purple-700'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                  </svg>
+                  <span className="hidden sm:inline">Quests</span>
+                  {visibleSuggestions.length > 0 && (
+                    <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${
+                      activeTab === 'quests' ? 'bg-purple-100 text-purple-700' : 'bg-white/20 text-white'
+                    }`}>
+                      {visibleSuggestions.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                    activeTab === 'chat'
+                      ? 'bg-white text-purple-700'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                  </svg>
+                  <span className="hidden sm:inline">Chat</span>
+                </button>
+              </div>
+
               {/* Reset position button - only shown when not inline and position is set */}
               {!inline && position && (
                 <button
                   onClick={handleResetPosition}
-                  className="p-1.5 hover:bg-white/20 rounded transition-colors touch-target tap-highlight-none"
+                  className="ml-auto p-1.5 hover:bg-white/20 rounded transition-colors touch-target tap-highlight-none"
                   title="Reset position"
                 >
                   <svg className="w-4 h-4 text-white/70" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -702,15 +824,15 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                   </svg>
                 </button>
               )}
-              <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full whitespace-nowrap">
-                {visibleSuggestions.length} {visibleSuggestions.length === 1 ? 'quest' : 'quests'}
-              </span>
             </div>
           </div>
 
-          {/* Voice Input Section with Wizard - Mobile optimized */}
-          {isVoiceSupported && onCreateTask && (
-            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+          {/* Quests Tab Content */}
+          {activeTab === 'quests' && (
+            <>
+              {/* Voice Input Section with Wizard - Mobile optimized */}
+              {isVoiceSupported && onCreateTask && (
+                <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
               {/* Wizard Progress */}
               {wizardStep !== 'idle' && (
                 <div className="mb-2.5 sm:mb-3">
@@ -954,6 +1076,84 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
               </div>
             )}
           </div>
+            </>
+          )}
+
+          {/* Chat Tab Content */}
+          {activeTab === 'chat' && (
+            <div className="flex flex-col h-[50vh] sm:h-[55vh]">
+              {/* Chat Messages */}
+              <div
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto p-3 space-y-3"
+              >
+                {chatHistory.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <svg className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                    </svg>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Ask me anything!</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      I have context about {projectName || 'this project'}
+                    </p>
+                  </div>
+                ) : (
+                  chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
+                          msg.role === 'user'
+                            ? 'bg-purple-600 text-white rounded-br-sm'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-sm'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {isChatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-xl rounded-bl-sm">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Input */}
+              <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+                <div className="flex gap-2">
+                  <textarea
+                    ref={chatInputRef}
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    onKeyDown={handleChatKeyDown}
+                    placeholder="Ask about your project..."
+                    rows={1}
+                    className="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none placeholder-gray-500 dark:placeholder-gray-400"
+                    style={{ minHeight: '40px', maxHeight: '100px' }}
+                  />
+                  <button
+                    onClick={sendChatMessage}
+                    disabled={!chatMessage.trim() || isChatLoading}
+                    className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:dark:bg-gray-600 text-white rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
