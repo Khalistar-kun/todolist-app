@@ -676,21 +676,21 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
         )}
       </button>
 
-      {/* Quest Panel */}
+      {/* Quest Panel - Mobile optimized */}
       {isOpen && (
-        <div className={`absolute ${getPanelPosition()} w-80 sm:w-96 max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-scale-in`}>
+        <div className={`absolute ${getPanelPosition()} w-[calc(100vw-32px)] sm:w-96 max-w-[380px] max-h-[75vh] sm:max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-scale-in`}>
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3">
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-3 sm:px-4 py-2.5 sm:py-3">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
               </svg>
-              <span className="font-semibold text-white">AI Insights</span>
+              <span className="font-semibold text-white text-sm sm:text-base">AI Insights</span>
               {/* Reset position button */}
               {position && (
                 <button
                   onClick={handleResetPosition}
-                  className="p-1 hover:bg-white/20 rounded transition-colors"
+                  className="p-1.5 hover:bg-white/20 rounded transition-colors touch-target tap-highlight-none"
                   title="Reset position"
                 >
                   <svg className="w-4 h-4 text-white/70" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -698,34 +698,34 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                   </svg>
                 </button>
               )}
-              <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full">
+              <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full whitespace-nowrap">
                 {visibleSuggestions.length} {visibleSuggestions.length === 1 ? 'quest' : 'quests'}
               </span>
             </div>
           </div>
 
-          {/* Voice Input Section with Wizard */}
+          {/* Voice Input Section with Wizard - Mobile optimized */}
           {isVoiceSupported && onCreateTask && (
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
               {/* Wizard Progress */}
               {wizardStep !== 'idle' && (
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="mb-2.5 sm:mb-3">
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
                       Step {['title', 'description', 'priority', 'due_date', 'assignees', 'confirm'].indexOf(wizardStep) + 1} of {members.length > 0 ? 6 : 5}
                     </span>
                     <button
                       onClick={cancelWizard}
-                      className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 -mr-2 touch-target tap-highlight-none"
                     >
                       Cancel
                     </button>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-0.5 sm:gap-1">
                     {['title', 'description', 'priority', 'due_date', ...(members.length > 0 ? ['assignees'] : []), 'confirm'].map((step, i) => (
                       <div
                         key={step}
-                        className={`h-1 flex-1 rounded-full transition-colors ${
+                        className={`h-1.5 sm:h-1 flex-1 rounded-full transition-colors ${
                           ['title', 'description', 'priority', 'due_date', 'assignees', 'confirm'].indexOf(wizardStep) >= i
                             ? 'bg-purple-500'
                             : 'bg-gray-200 dark:bg-gray-700'
@@ -736,25 +736,25 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                 </div>
               )}
 
-              {/* Confirm Step UI */}
+              {/* Confirm Step UI - Mobile optimized */}
               {wizardStep === 'confirm' ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
+                <div className="space-y-2.5 sm:space-y-3">
+                  <div className="p-2.5 sm:p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
                     <div>
                       <span className="text-xs text-gray-500">Title</span>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{taskData.title}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white break-words">{taskData.title}</p>
                     </div>
                     {taskData.description && (
                       <div>
                         <span className="text-xs text-gray-500">Description</span>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">{taskData.description}</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 break-words line-clamp-3">{taskData.description}</p>
                       </div>
                     )}
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-3 sm:gap-4">
                       {taskData.priority && (
                         <div>
                           <span className="text-xs text-gray-500">Priority</span>
-                          <p className={`text-sm font-medium ${
+                          <p className={`text-sm font-medium capitalize ${
                             taskData.priority === 'urgent' ? 'text-red-600' :
                             taskData.priority === 'high' ? 'text-orange-600' :
                             taskData.priority === 'medium' ? 'text-yellow-600' :
@@ -788,21 +788,21 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                   <div className="flex gap-2">
                     <button
                       onClick={cancelWizard}
-                      className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                      className="flex-1 px-3 py-2.5 sm:py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors touch-target tap-highlight-none active:scale-[0.98]"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={confirmTask}
-                      className="flex-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                      className="flex-1 px-3 py-2.5 sm:py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors touch-target tap-highlight-none active:scale-[0.98]"
                     >
                       Create Task
                     </button>
                   </div>
                 </div>
               ) : (
-                /* Voice Input UI */
-                <div className="flex items-center gap-3">
+                /* Voice Input UI - Mobile optimized */
+                <div className="flex items-center gap-2.5 sm:gap-3">
                   <button
                     onClick={() => {
                       if (wizardStep === 'idle') {
@@ -815,7 +815,7 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                       }
                     }}
                     disabled={isProcessingVoice}
-                    className={`relative flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                    className={`relative flex-shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all touch-target tap-highlight-none active:scale-95 ${
                       isListening
                         ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/30'
                         : isProcessingVoice
@@ -827,18 +827,18 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                     {isProcessingVoice ? (
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-300 border-t-purple-600" />
                     ) : isListening ? (
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="6" y="6" width="12" height="12" rx="2" />
                       </svg>
                     ) : (
-                      <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                       </svg>
                     )}
                   </button>
                   <div className="flex-1 min-w-0">
                     {isListening ? (
-                      <div className="space-y-1">
+                      <div className="space-y-0.5 sm:space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -846,13 +846,13 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                           </span>
                           <span className="text-sm font-medium text-red-600 dark:text-red-400">Listening...</span>
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">{STEP_PROMPTS[wizardStep]}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">{STEP_PROMPTS[wizardStep]}</p>
                         {liveTranscript && (
                           <p className="text-sm text-gray-800 dark:text-gray-200 truncate">&quot;{liveTranscript}&quot;</p>
                         )}
                       </div>
                     ) : isProcessingVoice ? (
-                      <div className="space-y-1">
+                      <div className="space-y-0.5 sm:space-y-1">
                         <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Processing...</span>
                         {voiceTranscript && (
                           <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{voiceTranscript}</p>
@@ -860,7 +860,7 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
                       </div>
                     ) : wizardStep !== 'idle' ? (
                       <div className="space-y-0.5">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{STEP_PROMPTS[wizardStep]}</span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 line-clamp-1">{STEP_PROMPTS[wizardStep]}</span>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Tap mic to answer or say &quot;skip&quot;</p>
                       </div>
                     ) : (

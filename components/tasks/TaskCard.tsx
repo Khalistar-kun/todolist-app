@@ -58,6 +58,7 @@ export function TaskCard({
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const {
     attributes,
@@ -131,13 +132,24 @@ export function TaskCard({
     setMenuOpen(!menuOpen)
   }, [menuOpen])
 
-  // Handle delete
+  // Handle delete - show confirmation first
   const handleDelete = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setMenuOpen(false)
+    setShowDeleteConfirm(true)
+  }, [])
+
+  // Confirm delete
+  const confirmDelete = useCallback(() => {
+    setShowDeleteConfirm(false)
     onDelete?.(task)
   }, [task, onDelete])
+
+  // Cancel delete
+  const cancelDelete = useCallback(() => {
+    setShowDeleteConfirm(false)
+  }, [])
 
   // Handle duplicate
   const handleDuplicate = useCallback((e: React.MouseEvent) => {
@@ -288,6 +300,20 @@ export function TaskCard({
 
         {/* Action Buttons - Always visible on touch devices, hover on desktop */}
         <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity relative">
+          {/* Quick Delete Button - Visible only for admin/owner */}
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              className="touch-target p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors tap-highlight-none"
+              title="Delete task"
+              aria-label="Delete task"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+            </button>
+          )}
+
           {/* More menu button */}
           <button
             ref={menuButtonRef}
@@ -589,6 +615,59 @@ export function TaskCard({
           )}
         </div>
       </div>
+
+      {/* Mobile-friendly Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            cancelDelete()
+          }}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl sm:rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Task</h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Are you sure you want to delete &quot;{task.title.length > 40 ? task.title.substring(0, 40) + '...' : task.title}&quot;? This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  cancelDelete()
+                }}
+                className="flex-1 px-4 py-3 sm:py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl sm:rounded-lg transition-colors tap-highlight-none active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  confirmDelete()
+                }}
+                className="flex-1 px-4 py-3 sm:py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-xl sm:rounded-lg transition-colors tap-highlight-none active:scale-[0.98]"
+              >
+                Delete Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

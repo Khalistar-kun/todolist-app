@@ -11,6 +11,7 @@ import { MentionAutocomplete, MentionText } from '@/components/mentions/MentionA
 import { AIAssistButton } from '@/components/ai/AIAssistButton'
 import { AIDescriptionEnhancer } from '@/components/ai/AIDescriptionEnhancer'
 import { VoiceInputButton } from '@/components/ai/VoiceInputButton'
+import { VoiceEditButton, type VoiceEditResult } from '@/components/ai/VoiceEditButton'
 import type { TaskAnalysis } from '@/hooks/useAI'
 
 interface CommentWithUser extends Comment {
@@ -411,6 +412,48 @@ export function TaskModal({
     }
   }, [taskDetails])
 
+  // Handle voice edit results
+  const handleVoiceEdit = useCallback((result: VoiceEditResult) => {
+    setFormData(prev => {
+      const updated = { ...prev }
+
+      if (result.title) {
+        updated.title = result.title
+      }
+      if (result.description !== undefined) {
+        updated.description = result.description
+      }
+      if (result.priority) {
+        updated.priority = result.priority
+      }
+      if (result.due_date) {
+        // Format the date for datetime-local input
+        updated.due_date = formatDateForInput(result.due_date)
+      }
+      if (result.assignee_names && result.assignee_names.length > 0) {
+        // Find matching members by name
+        const matchedAssignees = result.assignee_names
+          .map(name => {
+            const lowerName = name.toLowerCase()
+            const member = projectMembers.find(m => {
+              const fullName = m.user.full_name?.toLowerCase() || ''
+              const email = m.user.email.toLowerCase()
+              return fullName.includes(lowerName) || email.includes(lowerName)
+            })
+            return member?.user_id
+          })
+          .filter((id): id is string => id !== undefined)
+
+        if (matchedAssignees.length > 0) {
+          // Add new assignees without duplicates
+          updated.assignees = [...new Set([...prev.assignees, ...matchedAssignees])]
+        }
+      }
+
+      return updated
+    })
+  }, [projectMembers])
+
   if (!isOpen) return null
 
   return (
@@ -420,9 +463,19 @@ export function TaskModal({
         <Dialog.Content className="fixed inset-0 sm:inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:max-h-[90vh] sm:max-h-[85vh] bg-white dark:bg-gray-900 sm:rounded-xl shadow-2xl z-50 flex flex-col border-0 sm:border border-gray-200 dark:border-gray-700 animate-scale-in overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
-              {readOnly ? 'View Task' : isEditing ? 'Edit Task' : 'Create Task'}
-            </Dialog.Title>
+            <div className="flex items-center gap-3">
+              <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
+                {readOnly ? 'View Task' : isEditing ? 'Edit Task' : 'Create Task'}
+              </Dialog.Title>
+              {/* Voice Edit Button - Only show when editing and not in read-only mode */}
+              {isEditing && !readOnly && (
+                <VoiceEditButton
+                  onEdit={handleVoiceEdit}
+                  currentTitle={formData.title}
+                  currentDescription={formData.description}
+                />
+              )}
+            </div>
             <Dialog.Close className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
