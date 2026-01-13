@@ -11,6 +11,7 @@
 :root {
   /* Base Surfaces - Warm off-white tones for visual depth */
   --bg-app: #F5F7FB;
+  --bg-app-gradient: linear-gradient(135deg, #F5F7FB 0%, #E8F4FD 50%, #F0E8FC 100%);
   --bg-surface: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-card-hover: #F8FAFC;
@@ -81,6 +82,7 @@
 .dark {
   /* Base Surfaces */
   --bg-app: #0F172A;
+  --bg-app-gradient: linear-gradient(135deg, #0F172A 0%, #0C1929 50%, #131525 100%);
   --bg-surface: #1E293B;
   --bg-card: #1E293B;
   --bg-card-hover: #334155;
@@ -156,9 +158,11 @@
   }
 
   body {
-    background-color: var(--bg-app);
+    background: var(--bg-app-gradient);
+    background-attachment: fixed;
     color: var(--text-primary);
     @apply font-sans transition-colors duration-200;
+    min-height: 100vh;
   }
 
   /* Scrollbar visibility - show on mobile for feedback, hide on desktop until hover */
