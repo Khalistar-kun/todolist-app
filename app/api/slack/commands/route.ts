@@ -130,9 +130,8 @@ export async function POST(request: NextRequest) {
             project_id: slackIntegration.project_id,
             title: taskTitle,
             status: 'todo',
-            created_by_slack: true,
-            slack_user_id: userId,
-            slack_user_name: userName,
+            priority: 'none',
+            stage_id: 'todo',
           })
           .select()
           .single()
