@@ -541,6 +541,15 @@
     @apply hover:-translate-y-0.5 hover:shadow-md transition-all;
   }
 
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* MOBILE TOUCH UTILITIES */
   /* Minimum 40x40px touch target for mobile usability */
   .touch-target {

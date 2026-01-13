@@ -415,14 +415,14 @@ export default function OrganizationDetailPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-          <nav className="flex space-x-8">
+        {/* Tabs - Horizontally scrollable on mobile */}
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <nav className="flex space-x-6 sm:space-x-8 overflow-x-auto scrollbar-hide">
             {(['overview', 'announcements', 'meetings', 'members', 'settings'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => { playClick(); setActiveTab(tab) }}
-                className={`py-4 px-1 border-b-2 font-medium text-sm capitalize transition-colors ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm capitalize transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab
                     ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
