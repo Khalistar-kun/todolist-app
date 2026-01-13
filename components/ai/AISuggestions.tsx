@@ -378,7 +378,8 @@ Only return valid JSON, nothing else.`
     setHasMoved(false)
   }, [isOpen])
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  // Touch move handler - uses native event for non-passive listener
+  const handleTouchMoveNative = useCallback((e: TouchEvent) => {
     if (!dragStartRef.current) return
 
     const touch = e.touches[0]
@@ -389,7 +390,7 @@ Only return valid JSON, nothing else.`
     if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
       setIsDragging(true)
       setHasMoved(true)
-      e.preventDefault() // Prevent scroll while dragging
+      e.preventDefault() // Prevent scroll while dragging - works with non-passive listener
 
       // Calculate new position
       let newX = dragStartRef.current.posX + deltaX
@@ -412,6 +413,19 @@ Only return valid JSON, nothing else.`
   // ============================================================================
   // ALL EFFECTS (hooks, must be unconditional)
   // ============================================================================
+
+  // Add non-passive touch move listener to allow preventDefault
+  useEffect(() => {
+    const fabElement = fabRef.current
+    if (!fabElement) return
+
+    // Add touch move with passive: false to allow preventDefault
+    fabElement.addEventListener('touchmove', handleTouchMoveNative, { passive: false })
+
+    return () => {
+      fabElement.removeEventListener('touchmove', handleTouchMoveNative)
+    }
+  }, [handleTouchMoveNative])
 
   // Initialize position from localStorage on mount
   useEffect(() => {
@@ -515,7 +529,6 @@ Only return valid JSON, nothing else.`
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg flex items-center justify-center tap-highlight-none select-none ${
           isDragging
