@@ -54,8 +54,9 @@ export function GlobalAIButton() {
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null)
   const fabRef = useRef<HTMLButtonElement>(null)
 
-  // Hide on auth pages
+  // Hide on auth pages and project detail pages (they have their own AI Insights button)
   const isAuthPage = pathname?.startsWith('/auth') || pathname === '/' || pathname?.startsWith('/login') || pathname?.startsWith('/signup')
+  const isProjectDetailPage = /^\/app\/projects\/[^/]+$/.test(pathname || '')
 
   // Get current position or default bottom-right
   const getCurrentPosition = useCallback(() => {
@@ -347,8 +348,8 @@ Guidelines:
     }
   }, [chatHistory])
 
-  // Don't render on auth pages or if not logged in
-  if (isAuthPage || !user) {
+  // Don't render on auth pages, project detail pages, or if not logged in
+  if (isAuthPage || isProjectDetailPage || !user) {
     return null
   }
 
