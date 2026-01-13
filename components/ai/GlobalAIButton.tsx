@@ -9,6 +9,13 @@ interface Position {
   y: number
 }
 
+interface ProjectSummary {
+  id: string
+  name: string
+  taskCount: number
+  completedCount: number
+}
+
 const POSITION_STORAGE_KEY = 'global-ai-fab-position'
 
 function getInitialPosition(): Position | null {
@@ -34,8 +41,11 @@ export function GlobalAIButton() {
   const [message, setMessage] = useState('')
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [contextLoaded, setContextLoaded] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
 
   // Drag state
   const [position, setPosition] = useState<Position | null>(null)
@@ -174,6 +184,39 @@ export function GlobalAIButton() {
     localStorage.removeItem(POSITION_STORAGE_KEY)
   }, [])
 
+  // Fetch user's projects for context
+  const fetchProjectContext = useCallback(async () => {
+    if (!user || contextLoaded) return
+
+    try {
+      const response = await fetch('/api/projects')
+      if (response.ok) {
+        const data = await response.json()
+        const projectSummaries: ProjectSummary[] = (data.projects || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          taskCount: p.tasks_count || 0,
+          completedCount: p.completed_tasks_count || 0,
+        }))
+        setProjects(projectSummaries)
+        setContextLoaded(true)
+      }
+    } catch (error) {
+      console.error('Error fetching project context:', error)
+    }
+  }, [user, contextLoaded])
+
+  // Build context string from projects
+  const buildContextString = useCallback(() => {
+    if (projects.length === 0) return ''
+
+    const projectList = projects.map(p =>
+      `- "${p.name}": ${p.taskCount} tasks, ${p.completedCount} completed`
+    ).join('\n')
+
+    return `\n\nUser's Projects:\n${projectList}\n\nTotal Projects: ${projects.length}`
+  }, [projects])
+
   // Send message to AI
   const sendMessage = useCallback(async () => {
     if (!message.trim() || isLoading) return
@@ -182,6 +225,8 @@ export function GlobalAIButton() {
     setMessage('')
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }])
     setIsLoading(true)
+
+    const projectContext = buildContextString()
 
     try {
       const response = await fetch('/api/ai', {
@@ -192,13 +237,21 @@ export function GlobalAIButton() {
           messages: [
             {
               role: 'system',
-              content: `You are a helpful AI assistant for a task management application called TodoApp.
-You help users with:
-- Task organization and prioritization tips
-- Project management advice
-- Productivity suggestions
-- General questions about the app
-Keep responses concise and helpful. Use markdown formatting when appropriate.`
+              content: `You are a helpful AI assistant for TodoApp, a task and project management application.
+
+Your role:
+- Help users manage their tasks and projects effectively
+- Provide productivity tips and project management advice
+- Answer questions about their projects and tasks
+- Suggest ways to improve workflow and organization
+
+${projectContext ? `Current user context:${projectContext}` : 'No project data available yet.'}
+
+Guidelines:
+- Be concise and actionable
+- Reference specific projects by name when relevant
+- Suggest practical next steps
+- Keep responses focused and helpful`
             },
             ...chatHistory.map(msg => ({ role: msg.role, content: msg.content })),
             { role: 'user', content: userMessage }
@@ -210,7 +263,9 @@ Keep responses concise and helpful. Use markdown formatting when appropriate.`
         const data = await response.json()
         setChatHistory(prev => [...prev, { role: 'assistant', content: data.response || 'Sorry, I could not process that request.' }])
       } else {
-        setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, there was an error processing your request.' }])
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || 'Sorry, there was an error processing your request.'
+        setChatHistory(prev => [...prev, { role: 'assistant', content: errorMessage }])
       }
     } catch (error) {
       console.error('AI chat error:', error)
@@ -218,7 +273,7 @@ Keep responses concise and helpful. Use markdown formatting when appropriate.`
     } finally {
       setIsLoading(false)
     }
-  }, [message, chatHistory, isLoading])
+  }, [message, chatHistory, isLoading, buildContextString])
 
   // Handle key press
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -274,12 +329,23 @@ Keep responses concise and helpful. Use markdown formatting when appropriate.`
     }
   }, [isOpen])
 
-  // Focus input when panel opens
+  // Focus input when panel opens and fetch context
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100)
+    if (isOpen) {
+      if (inputRef.current) {
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
+      // Fetch project context when panel opens
+      fetchProjectContext()
     }
-  }, [isOpen])
+  }, [isOpen, fetchProjectContext])
+
+  // Scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [chatHistory])
 
   // Don't render on auth pages or if not logged in
   if (isAuthPage || !user) {
@@ -369,14 +435,18 @@ Keep responses concise and helpful. Use markdown formatting when appropriate.`
           </div>
 
           {/* Chat Messages */}
-          <div className="h-64 sm:h-80 overflow-y-auto p-3 space-y-3">
+          <div ref={chatContainerRef} className="h-64 sm:h-80 overflow-y-auto p-3 space-y-3">
             {chatHistory.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center px-4">
                 <svg className="w-12 h-12 text-purple-300 dark:text-purple-600 mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Hi! I&apos;m your AI assistant.</p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Ask me anything about tasks, projects, or productivity!</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  {projects.length > 0
+                    ? `I can see you have ${projects.length} project${projects.length > 1 ? 's' : ''}. Ask me about your tasks!`
+                    : 'Ask me anything about tasks, projects, or productivity!'}
+                </p>
               </div>
             ) : (
               chatHistory.map((msg, i) => (
