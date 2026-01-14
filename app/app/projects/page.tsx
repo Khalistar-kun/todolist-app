@@ -179,19 +179,38 @@ export default function ProjectsPage() {
                   />
 
                   <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                        {project.name}
-                      </h3>
-                      <span
-                        className={`badge ${
-                          project.status === 'active'
-                            ? 'badge-success'
-                            : 'badge-gray'
-                        }`}
-                      >
-                        {project.status}
-                      </span>
+                    <div className="flex items-start gap-3 mb-4">
+                      {/* Project Image/Avatar */}
+                      {(project as any).image_url ? (
+                        <img
+                          src={(project as any).image_url}
+                          alt={project.name}
+                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                          style={{ backgroundColor: project.color }}
+                        >
+                          {project.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                            {project.name}
+                          </h3>
+                          <span
+                            className={`badge flex-shrink-0 ${
+                              project.status === 'active'
+                                ? 'badge-success'
+                                : 'badge-gray'
+                            }`}
+                          >
+                            {project.status}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
