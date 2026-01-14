@@ -116,8 +116,10 @@ export async function GET(
     const projectIds = projects?.map(p => p.id) || []
     let projectMembers: any[] = []
 
+    console.log('[API] Team projects:', projectIds.length, 'projects', projectIds)
+
     if (projectIds.length > 0) {
-      const { data: projMembers } = await supabaseAdmin
+      const { data: projMembers, error: projMembersError } = await supabaseAdmin
         .from('project_members')
         .select(`
           id,
@@ -129,6 +131,11 @@ export async function GET(
         `)
         .in('project_id', projectIds)
 
+      if (projMembersError) {
+        console.error('[API] Error fetching project members:', projMembersError)
+      }
+      console.log('[API] Project members found:', projMembers?.length || 0, 'for projects', projectIds)
+      console.log('[API] Project members data:', JSON.stringify(projMembers?.map(pm => ({ user_id: pm.user_id, email: pm.user?.email }))))
       projectMembers = projMembers || []
     }
 
@@ -136,10 +143,12 @@ export async function GET(
     const teamMemberMap = new Map(
       (teamMembers || []).map(m => [m.user_id, { ...m, source: 'team' as const }])
     )
+    console.log('[API] Team members user_ids:', Array.from(teamMemberMap.keys()))
 
     // Add project members who aren't already team members
     const projectMembersByUser = new Map<string, any>()
     for (const pm of projectMembers) {
+      console.log('[API] Checking project member:', pm.user_id, 'already in team?', teamMemberMap.has(pm.user_id))
       if (!teamMemberMap.has(pm.user_id)) {
         // If user is in multiple projects, keep track of all their project roles
         if (!projectMembersByUser.has(pm.user_id)) {
@@ -170,6 +179,8 @@ export async function GET(
       ...(teamMembers || []).map(m => ({ ...m, source: 'team' as const })),
       ...Array.from(projectMembersByUser.values()),
     ]
+
+    console.log('[API] Team members:', teamMembers?.length || 0, 'Project-only members:', projectMembersByUser.size, 'Total:', allMembers.length)
 
     return NextResponse.json({
       team: {
