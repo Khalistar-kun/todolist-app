@@ -140,8 +140,12 @@ export async function GET(
     }
 
     // Create a map of team members by user_id
+    // Handle user field - Supabase may return array or object depending on query
     const teamMemberMap = new Map(
-      (teamMembers || []).map(m => [m.user_id, { ...m, source: 'team' as const }])
+      (teamMembers || []).map(m => {
+        const userProfile = Array.isArray(m.user) ? m.user[0] : m.user
+        return [m.user_id, { ...m, user: userProfile, source: 'team' as const }]
+      })
     )
     console.log('[API] Team members user_ids:', Array.from(teamMemberMap.keys()))
 
@@ -150,6 +154,8 @@ export async function GET(
     for (const pm of projectMembers) {
       console.log('[API] Checking project member:', pm.user_id, 'already in team?', teamMemberMap.has(pm.user_id))
       if (!teamMemberMap.has(pm.user_id)) {
+        // Handle user field - Supabase may return array or object depending on query
+        const userProfile = Array.isArray(pm.user) ? pm.user[0] : pm.user
         // If user is in multiple projects, keep track of all their project roles
         if (!projectMembersByUser.has(pm.user_id)) {
           projectMembersByUser.set(pm.user_id, {
@@ -157,7 +163,7 @@ export async function GET(
             user_id: pm.user_id,
             role: pm.role,
             joined_at: pm.joined_at,
-            user: pm.user,
+            user: userProfile,
             source: 'project' as const,
             project_ids: [pm.project_id],
           })
@@ -176,7 +182,7 @@ export async function GET(
 
     // Combine team members and project-only members
     const allMembers = [
-      ...(teamMembers || []).map(m => ({ ...m, source: 'team' as const })),
+      ...Array.from(teamMemberMap.values()),
       ...Array.from(projectMembersByUser.values()),
     ]
 
