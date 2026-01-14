@@ -270,7 +270,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, description, avatar_url } = body
+    const { name, description, avatar_url, image_url } = body
 
     const supabaseAdmin = getSupabaseAdmin()
 
@@ -294,7 +294,9 @@ export async function PATCH(
     const updateData: Record<string, any> = {}
     if (name !== undefined) updateData.name = name.trim()
     if (description !== undefined) updateData.description = description?.trim() || null
-    if (avatar_url !== undefined) updateData.avatar_url = avatar_url
+    // Support both avatar_url and image_url - store as image_url in DB
+    if (avatar_url !== undefined) updateData.image_url = avatar_url
+    if (image_url !== undefined) updateData.image_url = image_url
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
