@@ -164,6 +164,76 @@ export async function GET(
   }
 }
 
+// PATCH - Update organization details
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: organizationId } = await params
+    const cookieStore = await cookies()
+    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { name, description, avatar_url } = body
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Check if user has admin/owner permissions
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json({ error: 'Organization not found or you are not a member' }, { status: 404 })
+    }
+
+    if (!['owner', 'admin'].includes(membership.role)) {
+      return NextResponse.json({ error: 'Only owners and admins can edit organization details' }, { status: 403 })
+    }
+
+    // Build update object
+    const updateData: Record<string, any> = {}
+    if (name !== undefined) updateData.name = name.trim()
+    if (description !== undefined) updateData.description = description?.trim() || null
+    if (avatar_url !== undefined) updateData.avatar_url = avatar_url
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
+
+    if (updateData.name !== undefined && !updateData.name) {
+      return NextResponse.json({ error: 'Organization name cannot be empty' }, { status: 400 })
+    }
+
+    const { data: updatedOrg, error: updateError } = await supabaseAdmin
+      .from('organizations')
+      .update(updateData)
+      .eq('id', organizationId)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('[API] Error updating organization:', updateError)
+      return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 })
+    }
+
+    console.log(`[API] Organization updated: ${updatedOrg.name} by user ${user.id}`)
+
+    return NextResponse.json({ organization: updatedOrg })
+  } catch (error) {
+    console.error('[API] Error in PATCH /api/organizations/[id]:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 // DELETE - Delete an organization (owner only)
 export async function DELETE(
   request: NextRequest,

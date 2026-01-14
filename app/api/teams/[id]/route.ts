@@ -94,7 +94,7 @@ export async function GET(
     }
 
     // Get team members
-    const { data: members } = await supabaseAdmin
+    const { data: teamMembers } = await supabaseAdmin
       .from('team_members')
       .select(`
         id,
@@ -112,11 +112,70 @@ export async function GET(
       .eq('team_id', teamId)
       .order('updated_at', { ascending: false })
 
+    // Get all project members from team's projects
+    const projectIds = projects?.map(p => p.id) || []
+    let projectMembers: any[] = []
+
+    if (projectIds.length > 0) {
+      const { data: projMembers } = await supabaseAdmin
+        .from('project_members')
+        .select(`
+          id,
+          user_id,
+          role,
+          joined_at,
+          project_id,
+          user:profiles(id, full_name, email, avatar_url)
+        `)
+        .in('project_id', projectIds)
+
+      projectMembers = projMembers || []
+    }
+
+    // Create a map of team members by user_id
+    const teamMemberMap = new Map(
+      (teamMembers || []).map(m => [m.user_id, { ...m, source: 'team' as const }])
+    )
+
+    // Add project members who aren't already team members
+    const projectMembersByUser = new Map<string, any>()
+    for (const pm of projectMembers) {
+      if (!teamMemberMap.has(pm.user_id)) {
+        // If user is in multiple projects, keep track of all their project roles
+        if (!projectMembersByUser.has(pm.user_id)) {
+          projectMembersByUser.set(pm.user_id, {
+            id: `proj-${pm.user_id}`,
+            user_id: pm.user_id,
+            role: pm.role,
+            joined_at: pm.joined_at,
+            user: pm.user,
+            source: 'project' as const,
+            project_ids: [pm.project_id],
+          })
+        } else {
+          // Add to existing entry's project list
+          const existing = projectMembersByUser.get(pm.user_id)
+          existing.project_ids.push(pm.project_id)
+          // Use the highest role among projects (owner > admin > member)
+          const roleRank = { owner: 3, admin: 2, member: 1 }
+          if ((roleRank[pm.role as keyof typeof roleRank] || 0) > (roleRank[existing.role as keyof typeof roleRank] || 0)) {
+            existing.role = pm.role
+          }
+        }
+      }
+    }
+
+    // Combine team members and project-only members
+    const allMembers = [
+      ...(teamMembers || []).map(m => ({ ...m, source: 'team' as const })),
+      ...Array.from(projectMembersByUser.values()),
+    ]
+
     return NextResponse.json({
       team: {
         ...team,
         user_role: membership?.role || null,
-        members: members || [],
+        members: allMembers,
         projects: projects || [],
       }
     })

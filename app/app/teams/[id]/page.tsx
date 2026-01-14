@@ -71,6 +71,7 @@ export default function TeamDetailPage() {
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editColor, setEditColor] = useState('')
+  const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
   const [orgMembers, setOrgMembers] = useState<any[]>([])
   const [selectedNewMember, setSelectedNewMember] = useState('')
   const isInitialLoadRef = useRef(true)
@@ -87,6 +88,7 @@ export default function TeamDetailPage() {
       setEditName(teamData.name)
       setEditDescription(teamData.description || '')
       setEditColor(teamData.color)
+      setEditImageUrl(teamData.image_url || null)
     } catch (error) {
       console.error('Error fetching team:', error)
       toast.error('Failed to load team')
@@ -201,6 +203,25 @@ export default function TeamDetailPage() {
     }
   }, [user, teamId, fetchTeam])
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB')
+      return
+    }
+
+    // Convert to base64 data URL
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string
+      setEditImageUrl(dataUrl)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleSaveTeam = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editName.trim()) return
@@ -211,6 +232,7 @@ export default function TeamDetailPage() {
         name: editName.trim(),
         description: editDescription.trim() || undefined,
         color: editColor,
+        image_url: editImageUrl || undefined,
       })
       playSuccess()
       toast.success('Team updated!')
@@ -514,14 +536,19 @@ export default function TeamDetailPage() {
                             <span className="badge badge-primary text-[10px]">You</span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{member.user.email}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          {member.user.email}
+                          {member.source === 'project' && (
+                            <span className="text-[10px] text-blue-500 dark:text-blue-400">(via project)</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`badge ${getRoleBadgeClass(member.role)}`}>
                         {member.role}
                       </span>
-                      {canEdit && member.user_id !== user.id && member.role !== 'owner' && (
+                      {canEdit && member.user_id !== user.id && member.role !== 'owner' && member.source !== 'project' && (
                         <button
                           onClick={() => handleRemoveMember(member.user_id, member.user.full_name || 'this member')}
                           className="p-1 text-gray-400 hover:text-red-500 transition-colors"
@@ -577,6 +604,51 @@ export default function TeamDetailPage() {
                     className="input w-full resize-none"
                     rows={3}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Team Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {editImageUrl ? (
+                      <img
+                        src={editImageUrl}
+                        alt="Team"
+                        className="w-16 h-16 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-xl"
+                        style={{ backgroundColor: editColor }}
+                      >
+                        {editName.charAt(0).toUpperCase() || 'T'}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <label className="btn btn-sm btn-secondary cursor-pointer">
+                        Upload Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                      </label>
+                      {editImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setEditImageUrl(null)}
+                          className="btn btn-sm btn-ghost text-red-500 ml-2"
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Max 2MB. PNG, JPG, or GIF
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div>

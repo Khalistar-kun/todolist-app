@@ -15,6 +15,7 @@ interface Organization {
   name: string
   slug: string
   description: string | null
+  avatar_url: string | null
   created_at: string
   created_by: string
 }
@@ -131,6 +132,13 @@ export default function OrganizationDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleting, setDeleting] = useState(false)
+
+  // Edit organization
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
+  const [savingOrg, setSavingOrg] = useState(false)
 
   const organizationId = params.id as string
   const isInitialLoadRef = useRef(true)
@@ -340,6 +348,65 @@ export default function OrganizationDetailPage() {
       setDeleting(false)
       setShowDeleteModal(false)
       setDeleteConfirmation('')
+    }
+  }
+
+  const handleOrgImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB')
+      return
+    }
+
+    // Convert to base64 data URL
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string
+      setEditImageUrl(dataUrl)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const openEditModal = () => {
+    if (organization) {
+      setEditName(organization.name)
+      setEditDescription(organization.description || '')
+      setEditImageUrl(organization.avatar_url || null)
+      setShowEditModal(true)
+    }
+  }
+
+  const handleSaveOrganization = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editName.trim()) return
+
+    setSavingOrg(true)
+    try {
+      const response = await fetch(`/api/organizations/${organizationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          description: editDescription.trim() || null,
+          avatar_url: editImageUrl,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      playSuccess()
+      toast.success('Organization updated!')
+      setShowEditModal(false)
+      refetchDataSilently()
+    } catch (error: any) {
+      console.error('Error updating organization:', error)
+      toast.error(error.message || 'Failed to update organization')
+    } finally {
+      setSavingOrg(false)
     }
   }
 
@@ -713,6 +780,41 @@ export default function OrganizationDetailPage() {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Organization Settings</h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Configure integrations and manage your organization</p>
                 </div>
+
+                {/* Organization Profile */}
+                <div className="card">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Organization Profile</h3>
+                  </div>
+                  <div className="p-5">
+                    <div className="flex items-center gap-4">
+                      {organization.avatar_url ? (
+                        <img
+                          src={organization.avatar_url}
+                          alt={organization.name}
+                          className="w-16 h-16 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-white flex items-center justify-center font-bold text-xl">
+                          {organization.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white">{organization.name}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {organization.description || 'No description'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { playClick(); openEditModal() }}
+                        className="btn btn-md btn-secondary"
+                      >
+                        Edit Profile
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <OrganizationSlackIntegration organizationId={organizationId} canManage={canManage} />
 
                 {/* Danger Zone - Only visible to owner */}
@@ -971,6 +1073,109 @@ export default function OrganizationDetailPage() {
                   className="btn btn-md btn-primary"
                 >
                   {inviting ? 'Inviting...' : 'Invite'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Organization Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Organization</h2>
+            </div>
+
+            <form onSubmit={handleSaveOrganization}>
+              <div className="px-6 py-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Organization Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="input w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="input w-full resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Organization Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {editImageUrl ? (
+                      <img
+                        src={editImageUrl}
+                        alt="Organization"
+                        className="w-16 h-16 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-white flex items-center justify-center font-bold text-xl">
+                        {editName.charAt(0).toUpperCase() || 'O'}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <label className="btn btn-sm btn-secondary cursor-pointer">
+                        Upload Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleOrgImageChange}
+                          className="hidden"
+                        />
+                      </label>
+                      {editImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setEditImageUrl(null)}
+                          className="btn btn-sm btn-ghost text-red-500 ml-2"
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Max 2MB. PNG, JPG, or GIF
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="btn btn-md btn-secondary"
+                  disabled={savingOrg}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingOrg || !editName.trim()}
+                  className="btn btn-md btn-primary"
+                >
+                  {savingOrg ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

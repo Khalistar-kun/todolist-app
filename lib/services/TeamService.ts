@@ -23,6 +23,8 @@ export interface TeamMember {
   user_id: string
   role: 'owner' | 'admin' | 'member'
   joined_at: string
+  source?: 'team' | 'project'
+  project_ids?: string[]
   user: {
     id: string
     full_name: string | null
