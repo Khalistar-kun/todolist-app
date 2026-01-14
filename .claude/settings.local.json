@@ -41,7 +41,8 @@
       "Bash(are required\" because the tasks API GET endpoint was not including\nproject_id in its select statement.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git diff:*)",
       "Bash(npm ls:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(ls:*)"
     ]
   }
 }

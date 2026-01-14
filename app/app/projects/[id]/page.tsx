@@ -43,6 +43,14 @@ export default function ProjectPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  // Edit project modal state
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
+  const [savingProject, setSavingProject] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
   const { permissions, loading: permissionsLoading } = useProjectPermissions(projectId)
   const isInitialLoadRef = useRef(true)
 
@@ -419,6 +427,75 @@ export default function ProjectPage() {
     }
   }
 
+  // Open edit modal with current values
+  const handleOpenEditModal = () => {
+    if (!project) return
+    setEditName(project.name)
+    setEditDescription(project.description || '')
+    setEditImageUrl((project as any).image_url || null)
+    setShowEditModal(true)
+  }
+
+  // Handle image file selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB')
+      return
+    }
+
+    // Convert to base64 data URL
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string
+      setEditImageUrl(dataUrl)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Save project changes
+  const handleSaveProject = async () => {
+    if (!editName.trim()) {
+      toast.error('Project name cannot be empty')
+      return
+    }
+
+    setSavingProject(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          description: editDescription.trim(),
+          image_url: editImageUrl,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      toast.success('Project updated successfully')
+      setShowEditModal(false)
+      // Refresh project data
+      refetchProjectDataSilently()
+    } catch (error: any) {
+      console.error('Error updating project:', error)
+      toast.error(error.message || 'Failed to update project')
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
   // Handler for AI Insight action clicks
   const handleAIActionClick = async (action: TaskSuggestion['action']) => {
     if (!action) return
@@ -691,13 +768,48 @@ export default function ProjectPage() {
         <div className="mb-8">
           <div className="flex items-start sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-              <div
-                className="w-4 h-4 rounded-full flex-shrink-0 mt-2 sm:mt-0"
-                style={{ backgroundColor: project.color }}
-              />
+              {/* Project Image/Avatar */}
+              <button
+                onClick={permissions.canEdit ? handleOpenEditModal : undefined}
+                className={`relative flex-shrink-0 ${permissions.canEdit ? 'cursor-pointer group' : ''}`}
+                disabled={!permissions.canEdit}
+              >
+                {(project as any).image_url ? (
+                  <img
+                    src={(project as any).image_url}
+                    alt={project.name}
+                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-gray-200 dark:border-gray-700"
+                  />
+                ) : (
+                  <div
+                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-white font-bold text-lg sm:text-xl"
+                    style={{ backgroundColor: project.color }}
+                  >
+                    {project.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {permissions.canEdit && (
+                  <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                    </svg>
+                  </div>
+                )}
+              </button>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">{project.name}</h1>
+                  {permissions.canEdit && (
+                    <button
+                      onClick={handleOpenEditModal}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      title="Edit project"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                      </svg>
+                    </button>
+                  )}
                   {permissions.role && (
                     <span className={`text-xs font-medium px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap ${getRoleBadgeClasses()}`}>
                       {roleConfig[permissions.role].label}
@@ -1056,6 +1168,124 @@ export default function ProjectPage() {
                   className="btn btn-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {deleting ? 'Deleting...' : 'Delete Project'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Project Modal */}
+        {showEditModal && project && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full animate-slide-up">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Project</h2>
+              </div>
+              <div className="px-6 py-4 space-y-4">
+                {/* Project Image */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Project Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="relative group"
+                    >
+                      {editImageUrl ? (
+                        <img
+                          src={editImageUrl}
+                          alt="Project"
+                          className="w-20 h-20 rounded-xl object-cover border-2 border-gray-200 dark:border-gray-700"
+                        />
+                      ) : (
+                        <div
+                          className="w-20 h-20 rounded-xl flex items-center justify-center text-white font-bold text-2xl"
+                          style={{ backgroundColor: project.color }}
+                        >
+                          {editName.charAt(0).toUpperCase() || project.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                        </svg>
+                      </div>
+                    </button>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Click to upload an image
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        PNG, JPG up to 2MB
+                      </p>
+                      {editImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setEditImageUrl(null)}
+                          className="text-xs text-red-600 hover:text-red-700 mt-1"
+                        >
+                          Remove image
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Project Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="input w-full"
+                    placeholder="Enter project name"
+                    required
+                  />
+                </div>
+
+                {/* Project Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="input w-full resize-none"
+                    rows={3}
+                    placeholder="Enter project description"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="btn btn-md btn-secondary"
+                  disabled={savingProject}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveProject}
+                  disabled={savingProject || !editName.trim()}
+                  className="btn btn-md btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingProject ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>

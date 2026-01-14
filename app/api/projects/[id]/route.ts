@@ -57,7 +57,7 @@ export async function GET(
       // Get project with only needed columns
       supabaseAdmin
         .from('projects')
-        .select('id, name, description, color, status, organization_id, workflow_stages, created_at')
+        .select('id, name, description, color, status, organization_id, workflow_stages, created_at, image_url')
         .eq('id', projectId)
         .single(),
 
@@ -148,6 +148,81 @@ export async function GET(
     })
   } catch (error) {
     console.error('[API] Error in GET /api/projects/[id]:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// PATCH - Update project details (name, description, image)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: projectId } = await params
+    const cookieStore = await cookies()
+    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { name, description, image_url } = body
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    // Check if user has edit permissions (owner or admin)
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json({ error: 'Project not found or you are not a member' }, { status: 404 })
+    }
+
+    if (membership.role !== 'owner' && membership.role !== 'admin') {
+      return NextResponse.json({ error: 'Only owners and admins can edit project details' }, { status: 403 })
+    }
+
+    // Build update object with only provided fields
+    const updateData: Record<string, any> = {}
+    if (name !== undefined) updateData.name = name.trim()
+    if (description !== undefined) updateData.description = description.trim()
+    if (image_url !== undefined) updateData.image_url = image_url
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
+
+    // Validate name is not empty if provided
+    if (updateData.name !== undefined && !updateData.name) {
+      return NextResponse.json({ error: 'Project name cannot be empty' }, { status: 400 })
+    }
+
+    // Update the project
+    const { data: updatedProject, error: updateError } = await supabaseAdmin
+      .from('projects')
+      .update(updateData)
+      .eq('id', projectId)
+      .select('id, name, description, image_url, color, status')
+      .single()
+
+    if (updateError) {
+      console.error('[API] Error updating project:', updateError)
+      return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
+    }
+
+    console.log(`[API] Project updated: ${updatedProject.name} by user ${user.id}`)
+
+    return NextResponse.json({
+      success: true,
+      project: updatedProject
+    })
+  } catch (error) {
+    console.error('[API] Error in PATCH /api/projects/[id]:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
