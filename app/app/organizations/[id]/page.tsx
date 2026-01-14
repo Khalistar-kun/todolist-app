@@ -374,7 +374,7 @@ export default function OrganizationDetailPage() {
     if (organization) {
       setEditName(organization.name)
       setEditDescription(organization.description || '')
-      setEditImageUrl(organization.image_url || organization.avatar_url || null)
+      setEditImageUrl((organization as any).image_url || organization.avatar_url || null)
       setShowEditModal(true)
     }
   }
@@ -788,9 +788,9 @@ export default function OrganizationDetailPage() {
                   </div>
                   <div className="p-5">
                     <div className="flex items-center gap-4">
-                      {(organization.image_url || organization.avatar_url) ? (
+                      {((organization as any).image_url || organization.avatar_url) ? (
                         <img
-                          src={organization.image_url || organization.avatar_url}
+                          src={(organization as any).image_url || organization.avatar_url}
                           alt={organization.name}
                           className="w-16 h-16 rounded-xl object-cover"
                         />
