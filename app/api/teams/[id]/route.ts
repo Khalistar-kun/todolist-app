@@ -94,16 +94,25 @@ export async function GET(
     }
 
     // Get team members
-    const { data: teamMembers } = await supabaseAdmin
+    const { data: rawTeamMembers } = await supabaseAdmin
       .from('team_members')
-      .select(`
-        id,
-        user_id,
-        role,
-        joined_at,
-        user:profiles(id, full_name, email, avatar_url)
-      `)
+      .select('id, user_id, role, joined_at')
       .eq('team_id', teamId)
+
+    // Fetch profiles for team members
+    let teamMembers: any[] = []
+    if (rawTeamMembers && rawTeamMembers.length > 0) {
+      const teamUserIds = rawTeamMembers.map(m => m.user_id)
+      const { data: teamProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', teamUserIds)
+
+      teamMembers = rawTeamMembers.map(m => ({
+        ...m,
+        user: teamProfiles?.find(p => p.id === m.user_id) || { id: m.user_id, full_name: null, email: '', avatar_url: null }
+      }))
+    }
 
     // Get team projects
     const { data: projects } = await supabaseAdmin
@@ -119,43 +128,46 @@ export async function GET(
     console.log('[API] Team projects:', projectIds.length, 'projects', projectIds)
 
     if (projectIds.length > 0) {
+      // First get project members
       const { data: projMembers, error: projMembersError } = await supabaseAdmin
         .from('project_members')
-        .select(`
-          id,
-          user_id,
-          role,
-          joined_at,
-          project_id,
-          user:profiles(id, full_name, email, avatar_url)
-        `)
+        .select('id, user_id, role, joined_at, project_id')
         .in('project_id', projectIds)
 
       if (projMembersError) {
         console.error('[API] Error fetching project members:', projMembersError)
       }
       console.log('[API] Project members found:', projMembers?.length || 0, 'for projects', projectIds)
-      console.log('[API] Project members data:', JSON.stringify(projMembers?.map(pm => ({ user_id: pm.user_id, email: (pm.user as any)?.email }))))
-      projectMembers = projMembers || []
+
+      // Then fetch profiles for all project members
+      if (projMembers && projMembers.length > 0) {
+        const userIds = [...new Set(projMembers.map(pm => pm.user_id))]
+        const { data: profiles } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', userIds)
+
+        // Combine members with their profiles
+        projectMembers = projMembers.map(pm => ({
+          ...pm,
+          user: profiles?.find(p => p.id === pm.user_id) || { id: pm.user_id, full_name: null, email: '', avatar_url: null }
+        }))
+        console.log('[API] Project members with profiles:', projectMembers.length)
+      }
     }
 
     // Create a map of team members by user_id
-    // Handle user field - Supabase may return array or object depending on query
     const teamMemberMap = new Map(
-      (teamMembers || []).map(m => {
-        const userProfile = Array.isArray(m.user) ? m.user[0] : m.user
-        return [m.user_id, { ...m, user: userProfile, source: 'team' as const }]
-      })
+      teamMembers.map(m => [m.user_id, { ...m, source: 'team' as const }])
     )
     console.log('[API] Team members user_ids:', Array.from(teamMemberMap.keys()))
 
     // Add project members who aren't already team members
     const projectMembersByUser = new Map<string, any>()
     for (const pm of projectMembers) {
-      console.log('[API] Checking project member:', pm.user_id, 'already in team?', teamMemberMap.has(pm.user_id))
-      if (!teamMemberMap.has(pm.user_id)) {
-        // Handle user field - Supabase may return array or object depending on query
-        const userProfile = Array.isArray(pm.user) ? pm.user[0] : pm.user
+      const isInTeam = teamMemberMap.has(pm.user_id)
+      console.log('[API] Checking project member:', pm.user_id, pm.user?.email, 'already in team?', isInTeam)
+      if (!isInTeam) {
         // If user is in multiple projects, keep track of all their project roles
         if (!projectMembersByUser.has(pm.user_id)) {
           projectMembersByUser.set(pm.user_id, {
@@ -163,7 +175,7 @@ export async function GET(
             user_id: pm.user_id,
             role: pm.role,
             joined_at: pm.joined_at,
-            user: userProfile,
+            user: pm.user,
             source: 'project' as const,
             project_ids: [pm.project_id],
           })
@@ -186,7 +198,7 @@ export async function GET(
       ...Array.from(projectMembersByUser.values()),
     ]
 
-    console.log('[API] Team members:', teamMembers?.length || 0, 'Project-only members:', projectMembersByUser.size, 'Total:', allMembers.length)
+    console.log('[API] Final result - Team members:', teamMembers.length, 'Project-only members:', projectMembersByUser.size, 'Total:', allMembers.length)
 
     return NextResponse.json({
       team: {
