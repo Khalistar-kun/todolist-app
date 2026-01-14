@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, color, workflow_stages } = body
+    const { name, description, color, workflow_stages, team_id } = body
 
     if (!name) {
       return NextResponse.json(
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 4: Create the project
-    console.log('[API] Creating project in organization:', finalOrgId)
+    console.log('[API] Creating project in organization:', finalOrgId, 'team:', team_id || 'none')
     const { data: project, error: projectError } = await supabaseAdmin
       .from('projects')
       .insert({
@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         color: color || '#3B82F6',
         organization_id: finalOrgId,
+        team_id: team_id || null,
         created_by: user.id,
         workflow_stages: workflow_stages || [
           { id: 'todo', name: 'To Do', color: '#6B7280' },

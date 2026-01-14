@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { TeamService, Team } from '@/lib/services/TeamService'
 import toast from 'react-hot-toast'
 
 const DEFAULT_WORKFLOW_STAGES = [
@@ -23,15 +24,39 @@ const PROJECT_COLORS = [
   { name: 'Teal', value: '#14B8A6' },
 ]
 
-export default function NewProjectPage() {
+function NewProjectForm() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedTeamId = searchParams.get('team_id')
+
   const [loading, setLoading] = useState(false)
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(true)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     color: '#3B82F6',
+    team_id: preselectedTeamId || '',
   })
+
+  useEffect(() => {
+    async function fetchTeams() {
+      try {
+        const userTeams = await TeamService.getUserTeams()
+        setTeams(userTeams)
+        // If preselected team_id is valid, keep it; otherwise clear
+        if (preselectedTeamId && userTeams.some(t => t.id === preselectedTeamId)) {
+          setFormData(prev => ({ ...prev, team_id: preselectedTeamId }))
+        }
+      } catch (error) {
+        console.error('Error fetching teams:', error)
+      } finally {
+        setLoadingTeams(false)
+      }
+    }
+    fetchTeams()
+  }, [preselectedTeamId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,6 +84,7 @@ export default function NewProjectPage() {
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           color: formData.color,
+          team_id: formData.team_id || null,
           organization_id: user.id, // Will be handled by API
           workflow_stages: DEFAULT_WORKFLOW_STAGES,
         }),
@@ -79,6 +105,19 @@ export default function NewProjectPage() {
       setLoading(false)
     }
   }
+
+  // Group teams by organization
+  const teamsByOrg = teams.reduce((acc, team) => {
+    const orgId = team.organization_id
+    if (!acc[orgId]) {
+      acc[orgId] = {
+        orgName: (team as any).organization?.name || 'Organization',
+        teams: [],
+      }
+    }
+    acc[orgId].teams.push(team)
+    return acc
+  }, {} as Record<string, { orgName: string; teams: Team[] }>)
 
   return (
     <div className="px-4 py-6 sm:px-0">
@@ -108,6 +147,35 @@ export default function NewProjectPage() {
                 placeholder="Enter project name"
               />
             </div>
+
+            {/* Team Selection */}
+            {!loadingTeams && teams.length > 0 && (
+              <div>
+                <label htmlFor="team" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Team <span className="text-gray-400">(optional)</span>
+                </label>
+                <select
+                  id="team"
+                  value={formData.team_id}
+                  onChange={(e) => setFormData({ ...formData, team_id: e.target.value })}
+                  className="input mt-1"
+                >
+                  <option value="">No team (personal project)</option>
+                  {Object.entries(teamsByOrg).map(([orgId, { orgName, teams: orgTeams }]) => (
+                    <optgroup key={orgId} label={orgName}>
+                      {orgTeams.map(team => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Assign this project to a team for better organization
+                </p>
+              </div>
+            )}
 
             {/* Description */}
             <div>
@@ -213,5 +281,29 @@ export default function NewProjectPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function NewProjectPage() {
+  return (
+    <Suspense fallback={
+      <div className="px-4 py-6 sm:px-0">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-8">
+            <div className="h-9 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+            <div className="h-5 w-64 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
+          <div className="card p-6">
+            <div className="space-y-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-10 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <NewProjectForm />
+    </Suspense>
   )
 }
