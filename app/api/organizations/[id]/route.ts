@@ -86,22 +86,47 @@ export async function GET(
       console.error('[API] Error fetching members:', membersError)
     }
 
-    // Fetch all projects in this organization
-    const { data: orgProjects } = await supabaseAdmin
-      .from('projects')
-      .select('id, name, organization_id')
+    // Fetch all teams in this organization
+    const { data: orgTeams } = await supabaseAdmin
+      .from('teams')
+      .select('id')
       .eq('organization_id', organizationId)
 
-    const projectIds = orgProjects?.map(p => p.id) || []
-    console.log('[API] Organization', organizationId, 'projects:', projectIds.length, orgProjects?.map(p => p.name))
+    const teamIds = orgTeams?.map(t => t.id) || []
+    console.log('[API] Organization', organizationId, 'teams:', teamIds.length)
 
-    // Fetch all project members from organization's projects
+    // Fetch all projects in this organization's teams
+    let projectIds: string[] = []
+    if (teamIds.length > 0) {
+      const { data: teamProjects } = await supabaseAdmin
+        .from('projects')
+        .select('id, name')
+        .in('team_id', teamIds)
+
+      projectIds = teamProjects?.map(p => p.id) || []
+      console.log('[API] Projects in org teams:', projectIds.length, teamProjects?.map(p => p.name))
+    }
+
+    // Also fetch projects directly in this organization (without team)
+    const { data: directProjects } = await supabaseAdmin
+      .from('projects')
+      .select('id, name')
+      .eq('organization_id', organizationId)
+
+    const directProjectIds = directProjects?.map(p => p.id) || []
+    console.log('[API] Direct org projects:', directProjectIds.length, directProjects?.map(p => p.name))
+
+    // Combine all project IDs
+    const allProjectIds = [...new Set([...projectIds, ...directProjectIds])]
+    console.log('[API] Total unique projects:', allProjectIds.length)
+
+    // Fetch all project members from all projects
     let projectMembers: any[] = []
-    if (projectIds.length > 0) {
+    if (allProjectIds.length > 0) {
       const { data: projMembers } = await supabaseAdmin
         .from('project_members')
         .select('id, user_id, role, joined_at, project_id')
-        .in('project_id', projectIds)
+        .in('project_id', allProjectIds)
 
       projectMembers = projMembers || []
       console.log('[API] Project members in org:', projectMembers.length)
