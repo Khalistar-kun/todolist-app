@@ -63,7 +63,11 @@ export default function TeamDetailPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [showAddProjectModal, setShowAddProjectModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [availableProjects, setAvailableProjects] = useState<any[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [loadingProjects, setLoadingProjects] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editColor, setEditColor] = useState('')
@@ -113,6 +117,67 @@ export default function TeamDetailPage() {
       fetchOrgMembers()
     }
   }, [team?.organization_id, fetchOrgMembers])
+
+  const fetchAvailableProjects = useCallback(async () => {
+    if (!user) return
+    setLoadingProjects(true)
+    try {
+      // Get all projects the user is an owner of
+      const { data: memberships } = await supabase
+        .from('project_members')
+        .select(`
+          project_id,
+          role,
+          project:projects(id, name, color, image_url, team_id, organization_id)
+        `)
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+
+      // Filter to projects that:
+      // 1. Are not already in this team
+      // 2. Are in the same organization as this team (or have no team yet)
+      const projects = memberships
+        ?.map(m => m.project as any)
+        .filter((p: any) => p && p.team_id !== teamId && (p.organization_id === team?.organization_id || !p.team_id))
+        || []
+
+      setAvailableProjects(projects)
+    } catch (error) {
+      console.error('Error fetching available projects:', error)
+    } finally {
+      setLoadingProjects(false)
+    }
+  }, [user, teamId, team?.organization_id])
+
+  const handleAddProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedProjectId) return
+
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/projects/${selectedProjectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team_id: teamId }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to add project to team')
+      }
+
+      playSuccess()
+      toast.success('Project added to team!')
+      setShowAddProjectModal(false)
+      setSelectedProjectId('')
+      fetchTeam()
+    } catch (error: any) {
+      playError()
+      toast.error(error.message || 'Failed to add project to team')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   useRealtimeSubscription({
     subscriptions: [
@@ -320,13 +385,27 @@ export default function TeamDetailPage() {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Projects ({team.projects.length})
                 </h2>
-                <Link
-                  href={`/app/projects/new?team_id=${teamId}`}
-                  className="btn btn-sm btn-primary"
-                  onClick={() => playClick()}
-                >
-                  New Project
-                </Link>
+                <div className="flex items-center gap-2">
+                  {canEdit && (
+                    <button
+                      onClick={() => {
+                        playClick()
+                        fetchAvailableProjects()
+                        setShowAddProjectModal(true)
+                      }}
+                      className="btn btn-sm btn-secondary"
+                    >
+                      Add Existing
+                    </button>
+                  )}
+                  <Link
+                    href={`/app/projects/new?team_id=${teamId}`}
+                    className="btn btn-sm btn-primary"
+                    onClick={() => playClick()}
+                  >
+                    New Project
+                  </Link>
+                </div>
               </div>
 
               {team.projects.length > 0 ? (
@@ -592,6 +671,114 @@ export default function TeamDetailPage() {
                 >
                   {saving ? 'Adding...' : 'Add Member'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Existing Project Modal */}
+      {showAddProjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Add Existing Project</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Add a project you own to this team
+              </p>
+            </div>
+
+            <form onSubmit={handleAddProject}>
+              <div className="px-6 py-4">
+                {loadingProjects ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="spinner spinner-md"></div>
+                  </div>
+                ) : availableProjects.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                    <p className="text-gray-500 dark:text-gray-400">No available projects</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      You have no projects that can be added to this team
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Select Project
+                    </label>
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="input w-full"
+                      required
+                    >
+                      <option value="">Choose a project...</option>
+                      {availableProjects.map(project => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedProjectId && (
+                      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {(() => {
+                          const project = availableProjects.find(p => p.id === selectedProjectId)
+                          if (!project) return null
+                          return (
+                            <div className="flex items-center gap-3">
+                              {project.image_url ? (
+                                <img
+                                  src={project.image_url}
+                                  alt={project.name}
+                                  className="w-10 h-10 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold"
+                                  style={{ backgroundColor: project.color }}
+                                >
+                                  {project.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-white">{project.name}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {project.team_id ? 'Will be moved from another team' : 'Personal project'}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddProjectModal(false); setSelectedProjectId('') }}
+                  className="btn btn-md btn-secondary"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                {availableProjects.length > 0 && (
+                  <button
+                    type="submit"
+                    disabled={saving || !selectedProjectId}
+                    className="btn btn-md btn-primary"
+                  >
+                    {saving ? 'Adding...' : 'Add to Team'}
+                  </button>
+                )}
               </div>
             </form>
           </div>

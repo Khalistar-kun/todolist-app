@@ -167,7 +167,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, description, image_url } = body
+    const { name, description, image_url, team_id } = body
 
     const supabaseAdmin = getSupabaseAdmin()
 
@@ -192,6 +192,7 @@ export async function PATCH(
     if (name !== undefined) updateData.name = name.trim()
     if (description !== undefined) updateData.description = description.trim()
     if (image_url !== undefined) updateData.image_url = image_url
+    if (team_id !== undefined) updateData.team_id = team_id || null // Allow setting to null to remove from team
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -207,7 +208,7 @@ export async function PATCH(
       .from('projects')
       .update(updateData)
       .eq('id', projectId)
-      .select('id, name, description, image_url, color, status')
+      .select('id, name, description, image_url, color, status, team_id')
       .single()
 
     if (updateError) {
