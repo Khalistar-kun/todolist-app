@@ -89,11 +89,11 @@ export async function GET(
     // Fetch all projects in this organization
     const { data: orgProjects } = await supabaseAdmin
       .from('projects')
-      .select('id')
+      .select('id, name, organization_id')
       .eq('organization_id', organizationId)
 
     const projectIds = orgProjects?.map(p => p.id) || []
-    console.log('[API] Organization projects:', projectIds.length)
+    console.log('[API] Organization', organizationId, 'projects:', projectIds.length, orgProjects?.map(p => p.name))
 
     // Fetch all project members from organization's projects
     let projectMembers: any[] = []
