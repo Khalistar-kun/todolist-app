@@ -290,13 +290,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Only owners and admins can edit organization details' }, { status: 403 })
     }
 
-    // Build update object
+    // Build update object - only include fields that exist in the database
     const updateData: Record<string, any> = {}
     if (name !== undefined) updateData.name = name.trim()
     if (description !== undefined) updateData.description = description?.trim() || null
-    // Support both avatar_url and image_url - store as image_url in DB
-    if (avatar_url !== undefined) updateData.image_url = avatar_url
-    if (image_url !== undefined) updateData.image_url = image_url
+    // Note: avatar_url/image_url fields are ignored as the column doesn't exist in the database
+    // To enable image uploads, add an 'image_url' column to the organizations table in Supabase
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
