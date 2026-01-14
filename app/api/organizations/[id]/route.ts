@@ -313,7 +313,8 @@ export async function PATCH(
 
     if (updateError) {
       console.error('[API] Error updating organization:', updateError)
-      return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 })
+      console.error('[API] Update data was:', JSON.stringify(updateData))
+      return NextResponse.json({ error: `Failed to update organization: ${updateError.message}` }, { status: 500 })
     }
 
     console.log(`[API] Organization updated: ${updatedOrg.name} by user ${user.id}`)
