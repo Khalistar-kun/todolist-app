@@ -49,8 +49,54 @@ export interface ActivityFilters {
 export class ActivityService {
   /**
    * Get activity feed for a project
+   * First tries to read from activity_log table (persistent),
+   * falls back to dynamic generation if table doesn't exist or is empty
    */
   static async getProjectActivity(
+    projectId: string,
+    options: { limit?: number; offset?: number } = {}
+  ): Promise<Activity[]> {
+    const { limit = 50, offset = 0 } = options
+
+    // Try to get from persistent activity_log table first
+    const { data: loggedActivities, error: logError } = await supabase
+      .from('activity_log')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    // If activity_log table exists and has data, use it
+    if (!logError && loggedActivities && loggedActivities.length > 0) {
+      return loggedActivities.map(log => ({
+        id: log.id,
+        type: log.activity_type as ActivityType,
+        actor_id: log.actor_id,
+        actor_name: log.actor_name || 'Unknown',
+        actor_avatar: log.actor_avatar,
+        project_id: log.project_id,
+        project_name: log.project_name || 'Unknown Project',
+        project_color: log.project_color || '#3B82F6',
+        task_id: log.task_id,
+        task_title: log.task_title,
+        comment_id: log.comment_id,
+        milestone_id: log.milestone_id,
+        milestone_name: log.milestone_name,
+        target_user_id: log.target_user_id,
+        target_user_name: log.target_user_name,
+        metadata: log.metadata || {},
+        created_at: log.created_at,
+      }))
+    }
+
+    // Fall back to dynamic generation (for backwards compatibility)
+    return this.getProjectActivityDynamic(projectId, options)
+  }
+
+  /**
+   * Dynamic activity generation (legacy method, used as fallback)
+   */
+  private static async getProjectActivityDynamic(
     projectId: string,
     options: { limit?: number; offset?: number } = {}
   ): Promise<Activity[]> {
