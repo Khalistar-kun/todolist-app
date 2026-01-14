@@ -75,7 +75,7 @@ export async function GET(
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
-    // Fetch all members
+    // Fetch all organization members
     const { data: membersData, error: membersError } = await supabaseAdmin
       .from('organization_members')
       .select('id, user_id, role, joined_at')
@@ -86,21 +86,87 @@ export async function GET(
       console.error('[API] Error fetching members:', membersError)
     }
 
+    // Fetch all projects in this organization
+    const { data: orgProjects } = await supabaseAdmin
+      .from('projects')
+      .select('id')
+      .eq('organization_id', organizationId)
+
+    const projectIds = orgProjects?.map(p => p.id) || []
+    console.log('[API] Organization projects:', projectIds.length)
+
+    // Fetch all project members from organization's projects
+    let projectMembers: any[] = []
+    if (projectIds.length > 0) {
+      const { data: projMembers } = await supabaseAdmin
+        .from('project_members')
+        .select('id, user_id, role, joined_at, project_id')
+        .in('project_id', projectIds)
+
+      projectMembers = projMembers || []
+      console.log('[API] Project members in org:', projectMembers.length)
+    }
+
+    // Create a map of org members by user_id
+    const orgMemberMap = new Map(
+      (membersData || []).map(m => [m.user_id, { ...m, source: 'organization' as const }])
+    )
+
+    // Add project members who aren't already org members
+    const projectMembersByUser = new Map<string, any>()
+    for (const pm of projectMembers) {
+      if (!orgMemberMap.has(pm.user_id)) {
+        if (!projectMembersByUser.has(pm.user_id)) {
+          projectMembersByUser.set(pm.user_id, {
+            id: `proj-${pm.user_id}`,
+            user_id: pm.user_id,
+            role: pm.role,
+            joined_at: pm.joined_at,
+            source: 'project' as const,
+            project_ids: [pm.project_id],
+          })
+        } else {
+          const existing = projectMembersByUser.get(pm.user_id)
+          existing.project_ids.push(pm.project_id)
+          // Use highest role
+          const roleRank = { owner: 3, admin: 2, member: 1 }
+          if ((roleRank[pm.role as keyof typeof roleRank] || 0) > (roleRank[existing.role as keyof typeof roleRank] || 0)) {
+            existing.role = pm.role
+          }
+        }
+      }
+    }
+
+    // Combine all unique user IDs for profile fetching
+    const allUserIds = [
+      ...Array.from(orgMemberMap.keys()),
+      ...Array.from(projectMembersByUser.keys()),
+    ]
+
     // Fetch profiles for all members
     let members: any[] = []
-    if (membersData && membersData.length > 0) {
-      const userIds = membersData.map(m => m.user_id)
+    if (allUserIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('*')
-        .in('id', userIds)
+        .select('id, full_name, email, avatar_url')
+        .in('id', allUserIds)
 
-      // Combine members with their profiles
-      members = membersData.map(member => ({
+      // Combine org members with their profiles
+      const orgMembersWithProfiles = Array.from(orgMemberMap.values()).map(member => ({
         ...member,
         user: profiles?.find(p => p.id === member.user_id) || null
       }))
+
+      // Combine project members with their profiles
+      const projectMembersWithProfiles = Array.from(projectMembersByUser.values()).map(member => ({
+        ...member,
+        user: profiles?.find(p => p.id === member.user_id) || null
+      }))
+
+      members = [...orgMembersWithProfiles, ...projectMembersWithProfiles]
     }
+
+    console.log('[API] Total org members:', members.length, '(org:', orgMemberMap.size, '+ project:', projectMembersByUser.size, ')')
 
     // Fetch announcements (table might not exist yet)
     let announcements: any[] = []
