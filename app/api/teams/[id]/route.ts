@@ -135,7 +135,7 @@ export async function GET(
         console.error('[API] Error fetching project members:', projMembersError)
       }
       console.log('[API] Project members found:', projMembers?.length || 0, 'for projects', projectIds)
-      console.log('[API] Project members data:', JSON.stringify(projMembers?.map(pm => ({ user_id: pm.user_id, email: pm.user?.email }))))
+      console.log('[API] Project members data:', JSON.stringify(projMembers?.map(pm => ({ user_id: pm.user_id, email: (pm.user as any)?.email }))))
       projectMembers = projMembers || []
     }
 

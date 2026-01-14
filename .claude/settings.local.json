@@ -42,7 +42,8 @@
       "Bash(git diff:*)",
       "Bash(npm ls:*)",
       "Bash(npx eslint:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
