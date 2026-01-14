@@ -100,15 +100,29 @@ export default function TeamDetailPage() {
   const fetchOrgMembers = useCallback(async () => {
     if (!team?.organization_id) return
     try {
-      const { data: members } = await supabase
+      // Fetch members without join to avoid Supabase relation issues
+      const { data: rawMembers } = await supabase
         .from('organization_members')
-        .select(`
-          user_id,
-          role,
-          user:profiles(id, full_name, email, avatar_url)
-        `)
+        .select('user_id, role')
         .eq('organization_id', team.organization_id)
-      setOrgMembers(members || [])
+
+      if (!rawMembers || rawMembers.length === 0) {
+        setOrgMembers([])
+        return
+      }
+
+      // Fetch profiles separately
+      const userIds = rawMembers.map(m => m.user_id)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', userIds)
+
+      const membersWithProfiles = rawMembers.map(m => ({
+        ...m,
+        user: profiles?.find(p => p.id === m.user_id) || { id: m.user_id, full_name: null, email: '', avatar_url: null }
+      }))
+      setOrgMembers(membersWithProfiles)
     } catch (error) {
       console.error('Error fetching org members:', error)
     }

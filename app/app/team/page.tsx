@@ -119,14 +119,30 @@ export default function TeamPage() {
 
       const orgsWithMembers: OrganizationWithMembers[] = []
       for (const org of orgsData || []) {
-        const { data: members } = await supabase
+        // Fetch members without join to avoid Supabase relation issues
+        const { data: rawMembers } = await supabase
           .from('organization_members')
-          .select(`id, user_id, role, joined_at, user:profiles(*)`)
+          .select('id, user_id, role, joined_at')
           .eq('organization_id', org.id)
+
+        // Fetch profiles separately
+        let membersWithProfiles: OrganizationMember[] = []
+        if (rawMembers && rawMembers.length > 0) {
+          const userIds = rawMembers.map(m => m.user_id)
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .in('id', userIds)
+
+          membersWithProfiles = rawMembers.map(m => ({
+            ...m,
+            user: profiles?.find(p => p.id === m.user_id) || { id: m.user_id, full_name: null, email: '', avatar_url: null }
+          })) as OrganizationMember[]
+        }
 
         orgsWithMembers.push({
           ...org,
-          members: (members as unknown as OrganizationMember[]) || [],
+          members: membersWithProfiles,
         })
       }
       setOrganizations(orgsWithMembers)
