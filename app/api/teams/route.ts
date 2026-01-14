@@ -79,14 +79,14 @@ export async function GET(request: NextRequest) {
     }
 
     let teams = memberships?.map(m => ({
-      ...m.team,
+      ...(m.team as any),
       user_role: m.role,
       joined_at: m.joined_at,
     })).filter(Boolean) || []
 
     // Filter by organization if specified
     if (organizationId) {
-      teams = teams.filter(t => t.organization_id === organizationId)
+      teams = teams.filter((t: any) => t.organization_id === organizationId)
     }
 
     // Get member counts and project counts for each team
