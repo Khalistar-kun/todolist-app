@@ -297,13 +297,16 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
+    // Get existing task with more details for Slack notification
     const { data: existing } = await supabase
       .from('tasks')
-      .select('project_id')
+      .select('project_id, stage_id, status, title')
       .eq('id', id)
       .single()
 
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const oldStageId = existing.stage_id
 
     updates.updated_at = new Date().toISOString()
     updates.updated_by = user.id
@@ -314,6 +317,35 @@ export async function PATCH(request: NextRequest) {
       .eq('id', id)
       .select()
       .single()
+
+    // Send Slack notification if stage changed (task moved)
+    if (updates.stage_id && updates.stage_id !== oldStageId) {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+
+      void sendSlackNotification(supabase, existing.project_id, 'move', {
+        text: `Task moved: ${existing.title}`,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*${existing.title}* was moved\n\nFrom: ${oldStageId} → To: ${updates.stage_id}\nBy: ${userProfile?.full_name || 'Unknown user'}`,
+            },
+          },
+        ],
+      })
+    }
+
+    // Send Slack notification for general updates (not stage moves)
+    else if (Object.keys(updates).length > 2) { // More than just updated_at and updated_by
+      void sendSlackNotification(supabase, existing.project_id, 'update', {
+        text: `Task updated: ${existing.title}`,
+      })
+    }
 
     return NextResponse.json({ task })
   } catch (err) {
