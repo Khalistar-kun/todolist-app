@@ -105,7 +105,7 @@ export class ActivityService {
 
     // Get project info
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id, name, color')
       .eq('id', projectId)
       .single()
@@ -116,7 +116,7 @@ export class ActivityService {
     const [tasksResult, commentsResult, assignmentsResult] = await Promise.all([
       // Recent task updates
       supabase
-        .from('TODOAAPP.tasks')
+        .from('tasks')
         .select('id, title, created_at, updated_at, completed_at, stage_id, approval_status, created_by')
         .eq('project_id', projectId)
         .order('updated_at', { ascending: false })
@@ -124,7 +124,7 @@ export class ActivityService {
 
       // Recent comments
       supabase
-        .from('TODOAAPP.comments')
+        .from('comments')
         .select('id, content, created_at, task_id, created_by')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
@@ -132,7 +132,7 @@ export class ActivityService {
 
       // Recent assignments
       supabase
-        .from('TODOAAPP.task_assignments')
+        .from('task_assignments')
         .select('id, task_id, user_id, assigned_at, assigned_by')
         .order('assigned_at', { ascending: false })
         .limit(limit),
@@ -153,7 +153,7 @@ export class ActivityService {
 
     // Fetch all profiles at once
     const { data: profiles } = userIds.size > 0 ? await supabase
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', Array.from(userIds)) : { data: [] }
 
@@ -165,7 +165,7 @@ export class ActivityService {
     assignments.data?.forEach(a => a.task_id && taskIdsNeeded.add(a.task_id))
 
     const { data: taskTitles } = taskIdsNeeded.size > 0 ? await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('id, title, project_id')
       .in('id', Array.from(taskIdsNeeded)) : { data: [] }
 
@@ -296,7 +296,7 @@ export class ActivityService {
 
     // Get user's project memberships
     const { data: memberships } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('project_id')
       .eq('user_id', userId)
 
@@ -304,7 +304,7 @@ export class ActivityService {
 
     // Get projects info
     const { data: projects } = projectIds.length > 0 ? await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id, name, color')
       .in('id', projectIds) : { data: [] }
 
@@ -312,7 +312,7 @@ export class ActivityService {
 
     // Get tasks assigned to user
     const { data: assignments } = await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .select('id, task_id, assigned_at, assigned_by')
       .eq('user_id', userId)
       .order('assigned_at', { ascending: false })
@@ -320,7 +320,7 @@ export class ActivityService {
 
     // Get comments mentioning user
     const { data: mentions } = await supabase
-      .from('TODOAAPP.comments')
+      .from('comments')
       .select('id, content, created_at, task_id, project_id, created_by')
       .contains('mentions', [userId])
       .order('created_at', { ascending: false })
@@ -341,14 +341,14 @@ export class ActivityService {
 
     // Fetch tasks and profiles
     const { data: tasksData } = taskIds.size > 0 ? await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('id, title, project_id')
       .in('id', Array.from(taskIds)) : { data: [] }
 
     const taskMap = new Map(tasksData?.map(t => [t.id, t]) || [])
 
     const { data: profilesData } = userIdsNeeded.size > 0 ? await supabase
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', Array.from(userIdsNeeded)) : { data: [] }
 

@@ -54,7 +54,7 @@ export async function GET(
 
     // Get team with organization info
     const { data: team, error: teamError } = await supabaseAdmin
-      .from('TODOAAPP.teams')
+      .from('teams')
       .select(`
         id,
         name,
@@ -76,14 +76,14 @@ export async function GET(
 
     // Verify user has access (is org member or team member)
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('role')
       .eq('team_id', teamId)
       .eq('user_id', user.id)
       .single()
 
     const { data: orgMembership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('role')
       .eq('organization_id', team.organization_id)
       .eq('user_id', user.id)
@@ -95,7 +95,7 @@ export async function GET(
 
     // Get team members
     const { data: rawTeamMembers } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('id, user_id, role, joined_at')
       .eq('team_id', teamId)
 
@@ -104,7 +104,7 @@ export async function GET(
     if (rawTeamMembers && rawTeamMembers.length > 0) {
       const teamUserIds = rawTeamMembers.map(m => m.user_id)
       const { data: teamProfiles } = await supabaseAdmin
-        .from('TODOAAPP.profiles')
+        .from('profiles')
         .select('id, full_name, email, avatar_url')
         .in('id', teamUserIds)
 
@@ -116,7 +116,7 @@ export async function GET(
 
     // Get team projects
     const { data: projects } = await supabaseAdmin
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id, name, description, color, image_url, status, created_at')
       .eq('team_id', teamId)
       .order('updated_at', { ascending: false })
@@ -130,7 +130,7 @@ export async function GET(
     if (projectIds.length > 0) {
       // First get project members
       const { data: projMembers, error: projMembersError } = await supabaseAdmin
-        .from('TODOAAPP.project_members')
+        .from('project_members')
         .select('id, user_id, role, joined_at, project_id')
         .in('project_id', projectIds)
 
@@ -143,7 +143,7 @@ export async function GET(
       if (projMembers && projMembers.length > 0) {
         const userIds = [...new Set(projMembers.map(pm => pm.user_id))]
         const { data: profiles } = await supabaseAdmin
-          .from('TODOAAPP.profiles')
+          .from('profiles')
           .select('id, full_name, email, avatar_url')
           .in('id', userIds)
 
@@ -235,7 +235,7 @@ export async function PATCH(
 
     // Check user has edit permission
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('role')
       .eq('team_id', teamId)
       .eq('user_id', user.id)
@@ -261,7 +261,7 @@ export async function PATCH(
     }
 
     const { data: updatedTeam, error: updateError } = await supabaseAdmin
-      .from('TODOAAPP.teams')
+      .from('teams')
       .update(updateData)
       .eq('id', teamId)
       .select()
@@ -297,7 +297,7 @@ export async function DELETE(
 
     // Check user is team owner
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('role')
       .eq('team_id', teamId)
       .eq('user_id', user.id)
@@ -309,7 +309,7 @@ export async function DELETE(
 
     // Delete team (cascades to team_members, projects get team_id set to null)
     const { error: deleteError } = await supabaseAdmin
-      .from('TODOAAPP.teams')
+      .from('teams')
       .delete()
       .eq('id', teamId)
 

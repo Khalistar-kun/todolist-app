@@ -222,7 +222,7 @@ export class TaskDependencyService {
     // Get all tasks and dependencies for the project
     const [tasksResult, depsResult] = await Promise.all([
       supabase
-        .from('TODOAAPP.tasks')
+        .from('tasks')
         .select('*')
         .eq('project_id', projectId)
         .is('parent_task_id', null),

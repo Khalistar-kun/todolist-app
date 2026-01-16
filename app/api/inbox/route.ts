@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Build query
     let query = supabaseAdmin
-      .from('TODOAAPP.attention_items')
+      .from('attention_items')
       .select(`
         *,
         task:tasks(id, title, status, priority),
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // Get unread count
     const { count: unreadCount } = await supabaseAdmin
-      .from('TODOAAPP.attention_items')
+      .from('attention_items')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .is('read_at', null)
@@ -120,7 +120,7 @@ export async function PATCH(request: NextRequest) {
       if (item_id) {
         // Mark single item as read
         const { error } = await supabaseAdmin
-          .from('TODOAAPP.attention_items')
+          .from('attention_items')
           .update({ read_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq('id', item_id)
           .eq('user_id', user.id)
@@ -132,7 +132,7 @@ export async function PATCH(request: NextRequest) {
       } else if (item_ids && Array.isArray(item_ids)) {
         // Mark multiple items as read
         const { error } = await supabaseAdmin
-          .from('TODOAAPP.attention_items')
+          .from('attention_items')
           .update({ read_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .in('id', item_ids)
           .eq('user_id', user.id)
@@ -144,7 +144,7 @@ export async function PATCH(request: NextRequest) {
       }
     } else if (action === 'mark_all_read') {
       const { error } = await supabaseAdmin
-        .from('TODOAAPP.attention_items')
+        .from('attention_items')
         .update({ read_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('user_id', user.id)
         .is('read_at', null)
@@ -157,7 +157,7 @@ export async function PATCH(request: NextRequest) {
     } else if (action === 'dismiss') {
       if (item_id) {
         const { error } = await supabaseAdmin
-          .from('TODOAAPP.attention_items')
+          .from('attention_items')
           .update({ dismissed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq('id', item_id)
           .eq('user_id', user.id)
@@ -168,7 +168,7 @@ export async function PATCH(request: NextRequest) {
         }
       } else if (item_ids && Array.isArray(item_ids)) {
         const { error } = await supabaseAdmin
-          .from('TODOAAPP.attention_items')
+          .from('attention_items')
           .update({ dismissed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .in('id', item_ids)
           .eq('user_id', user.id)

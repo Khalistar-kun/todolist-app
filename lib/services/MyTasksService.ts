@@ -18,7 +18,7 @@ export class MyTasksService {
   static async getMyTasks(userId: string, filters?: MyTasksFilters): Promise<MyTask[]> {
     // First, get all task assignments for this user
     const { data: assignments, error: assignError } = await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .select('task_id')
       .eq('user_id', userId)
 
@@ -32,7 +32,7 @@ export class MyTasksService {
 
     // Now fetch the tasks with project info
     let query = supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select(`
         *,
         projects!inner (

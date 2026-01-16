@@ -113,7 +113,7 @@ async function executeAction(
       break
 
     case 'create_task':
-      await supabase.from('TODOAAPP.tasks').insert({
+      await supabase.from('tasks').insert({
         project_id: task.project_id,
         client_id: task.client_id,
         title: action.params.title,
@@ -130,7 +130,7 @@ async function executeAction(
       if (action.params.status) updates.status = action.params.status
       if (action.params.assignees) updates.assignees = action.params.assignees
 
-      await supabase.from('TODOAAPP.tasks').update(updates).eq('id', task.id)
+      await supabase.from('tasks').update(updates).eq('id', task.id)
       break
 
     case 'assign_user':
@@ -138,7 +138,7 @@ async function executeAction(
       const newAssignee = action.params.email
       if (newAssignee && !currentAssignees.includes(newAssignee)) {
         await supabase
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .update({
             assignees: [...currentAssignees, newAssignee],
           })
@@ -150,7 +150,7 @@ async function executeAction(
       const dueDate = action.params.due_date
       if (dueDate) {
         await supabase
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .update({ due_at: new Date(dueDate).toISOString() })
           .eq('id', task.id)
       }
@@ -159,7 +159,7 @@ async function executeAction(
     case 'change_status':
       if (action.params.status) {
         await supabase
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .update({
             status: action.params.status,
             completed_at: action.params.status === 'done' ? new Date().toISOString() : null,

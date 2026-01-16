@@ -27,7 +27,7 @@ export class TimeTrackingService {
    */
   static async startTimer(taskId: string, userId: string): Promise<TimeEntry> {
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .insert({
         task_id: taskId,
         user_id: userId,
@@ -47,7 +47,7 @@ export class TimeTrackingService {
   static async stopTimer(userId: string): Promise<TimeEntry | null> {
     // Find running timer
     const { data: runningTimer, error: findError } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select('*')
       .eq('user_id', userId)
       .eq('is_running', true)
@@ -64,7 +64,7 @@ export class TimeTrackingService {
 
     // Update the entry
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .update({
         is_running: false,
         ended_at: endedAt.toISOString(),
@@ -83,7 +83,7 @@ export class TimeTrackingService {
    */
   static async getRunningTimer(userId: string): Promise<RunningTimer | null> {
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select(`
         id,
         task_id,
@@ -128,7 +128,7 @@ export class TimeTrackingService {
     const entryDate = date || new Date()
 
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .insert({
         task_id: taskId,
         user_id: userId,
@@ -150,7 +150,7 @@ export class TimeTrackingService {
    */
   static async getTaskTimeEntries(taskId: string): Promise<Array<TimeEntry & { user: { full_name: string | null; avatar_url: string | null } }>> {
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select(`
         *,
         profiles!user_id (
@@ -177,7 +177,7 @@ export class TimeTrackingService {
    */
   static async getTaskTotalTime(taskId: string): Promise<number> {
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select('duration, started_at, is_running')
       .eq('task_id', taskId)
 
@@ -207,7 +207,7 @@ export class TimeTrackingService {
     endDate: Date
   ): Promise<TimeReport> {
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select(`
         *,
         tasks!inner (
@@ -260,7 +260,7 @@ export class TimeTrackingService {
     endDate?: Date
   ): Promise<{ total_hours: number; by_user: Array<{ user_id: string; user_name: string; hours: number }> }> {
     let query = supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select(`
         *,
         tasks!inner (
@@ -323,7 +323,7 @@ export class TimeTrackingService {
    */
   static async deleteTimeEntry(entryId: string): Promise<void> {
     const { error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .delete()
       .eq('id', entryId)
 
@@ -338,7 +338,7 @@ export class TimeTrackingService {
     updates: { duration?: number; description?: string }
   ): Promise<TimeEntry> {
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .update(updates)
       .eq('id', entryId)
       .select()

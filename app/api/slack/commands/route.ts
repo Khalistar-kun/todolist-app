@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     // Find the project connected to this channel
     const { data: slackIntegration } = await supabaseAdmin
-      .from('TODOAAPP.slack_integrations')
+      .from('slack_integrations')
       .select('project_id, access_token')
       .eq('channel_id', channelId)
       .single()
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
         // Get project workflow stages to find the 'todo' stage UUID
         const { data: project } = await supabaseAdmin
-          .from('TODOAAPP.projects')
+          .from('projects')
           .select('workflow_stages')
           .eq('id', slackIntegration.project_id)
           .single()
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
         // Get the project owner to use as created_by (required field)
         const { data: ownerMember } = await supabaseAdmin
-          .from('TODOAAPP.project_members')
+          .from('project_members')
           .select('user_id')
           .eq('project_id', slackIntegration.project_id)
           .eq('role', 'owner')
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
 
         // Create the task
         const { data: task, error } = await supabaseAdmin
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .insert({
             project_id: slackIntegration.project_id,
             title: taskTitle,
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
       case 'tasks': {
         // Get recent tasks
         const { data: tasks, error } = await supabaseAdmin
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .select('id, title, status, created_at')
           .eq('project_id', slackIntegration.project_id)
           .order('created_at', { ascending: false })
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
         const status = statusMap[subCommand]
 
         const { data: tasks, error } = await supabaseAdmin
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .select('id, title, status')
           .eq('project_id', slackIntegration.project_id)
           .eq('status', status)

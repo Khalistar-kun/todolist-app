@@ -49,7 +49,7 @@ export async function GET() {
     const supabaseAdmin = getSupabaseAdmin()
 
     const { data: profile, error } = await supabaseAdmin
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single()
@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest) {
 
     // Check if profile exists
     const { data: existingProfile } = await supabaseAdmin
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id')
       .eq('id', user.id)
       .single()
@@ -115,7 +115,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const result = await supabaseAdmin
-        .from('TODOAAPP.profiles')
+        .from('profiles')
         .update(updateData)
         .eq('id', user.id)
         .select()
@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest) {
     } else {
       // Insert new profile
       const result = await supabaseAdmin
-        .from('TODOAAPP.profiles')
+        .from('profiles')
         .insert({
           id: user.id,
           email: user.email,

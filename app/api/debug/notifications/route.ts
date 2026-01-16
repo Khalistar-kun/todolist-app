@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Check 1: Can we read from notifications table?
     console.log('[Debug] Checking notifications table read access...')
     const { data: notifications, error: readError } = await supabaseAdmin
-      .from('TODOAAPP.notifications')
+      .from('notifications')
       .select('*')
       .eq('user_id', user.id)
       .limit(5)
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     // Alternative: Try to get column info
     const { data: tableInfo, error: tableError } = await supabaseAdmin
-      .from('TODOAAPP.notifications')
+      .from('notifications')
       .select('*')
       .limit(0)
 
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: insertedNotif, error: insertError } = await supabaseAdmin
-      .from('TODOAAPP.notifications')
+      .from('notifications')
       .insert(testNotification)
       .select()
       .single()
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     // If insert succeeded, delete the test notification
     if (insertedNotif?.id) {
       await supabaseAdmin
-        .from('TODOAAPP.notifications')
+        .from('notifications')
         .delete()
         .eq('id', insertedNotif.id)
       diagnostics.checks.insert_notification.cleaned_up = true
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: validInserted, error: validError } = await supabaseAdmin
-      .from('TODOAAPP.notifications')
+      .from('notifications')
       .insert(validNotification)
       .select()
       .single()
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
     // Clean up valid test notification
     if (validInserted?.id) {
       await supabaseAdmin
-        .from('TODOAAPP.notifications')
+        .from('notifications')
         .delete()
         .eq('id', validInserted.id)
       diagnostics.checks.insert_with_valid_enum.cleaned_up = true
@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
 
     // Check 6: Get project owner info for debugging
     const { data: projectMemberships } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('project_id, role, user_id')
       .eq('user_id', user.id)
 

@@ -45,7 +45,7 @@ async function sendSlackNotification(
 ) {
   try {
     const { data: slack } = await supabase
-      .from('TODOAAPP.slack_integrations')
+      .from('slack_integrations')
       .select(
         'access_token, webhook_url, channel_id, notify_on_task_create, notify_on_task_update, notify_on_task_delete, notify_on_task_move, notify_on_task_complete'
       )
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin()
 
     const { data: member } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('id')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     }
 
     let query = supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('*', { count: 'exact' })
       .eq('project_id', projectId)
       .order('position', { ascending: true })
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
 
     // Project + workflow
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('workflow_stages')
       .eq('id', project_id)
       .single()
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     // Role check
     const { data: membership } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', project_id)
       .eq('user_id', user.id)
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
 
     // Position
     const { data: lastTask } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('position')
       .eq('project_id', project_id)
       .eq('stage_id', resolvedStageId)
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
 
     // INSERT TASK
     const { data: task, error: insertError } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .insert({
         project_id,
         title,
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
       : []
 
     if (safeAssignees.length > 0) {
-      await supabase.from('TODOAAPP.task_assignments').insert(
+      await supabase.from('task_assignments').insert(
         safeAssignees.map((uid: string) => ({
           task_id: task.id,
           user_id: uid,
@@ -298,7 +298,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = getSupabaseAdmin()
 
     const { data: existing } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('project_id')
       .eq('id', id)
       .single()
@@ -309,7 +309,7 @@ export async function PATCH(request: NextRequest) {
     updates.updated_by = user.id
 
     const { data: task } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .update(updates)
       .eq('id', id)
       .select()
@@ -338,14 +338,14 @@ export async function DELETE(request: NextRequest) {
     const supabase = getSupabaseAdmin()
 
     const { data: task } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('project_id, title')
       .eq('id', id)
       .single()
 
     if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    await supabase.from('TODOAAPP.tasks').delete().eq('id', id)
+    await supabase.from('tasks').delete().eq('id', id)
 
     void sendSlackNotification(supabase, task.project_id, 'delete', {
       text: `Task deleted: ${task.title}`,

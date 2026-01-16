@@ -55,7 +55,7 @@ export async function POST(
 
     // Check if user is admin/owner
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -90,13 +90,13 @@ export async function POST(
 
     // Notify all organization members about the new announcement
     const { data: orgData } = await supabaseAdmin
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .select('name')
       .eq('id', organizationId)
       .single()
 
     const { data: posterProfile } = await supabaseAdmin
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('full_name, email')
       .eq('id', user.id)
       .single()
@@ -106,7 +106,7 @@ export async function POST(
 
     // Get all organization members except the poster
     const { data: allMembers } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('user_id')
       .eq('organization_id', organizationId)
       .neq('user_id', user.id)
@@ -126,7 +126,7 @@ export async function POST(
         },
       }))
 
-      await supabaseAdmin.from('TODOAAPP.notifications').insert(notifications)
+      await supabaseAdmin.from('notifications').insert(notifications)
     }
 
     // Send Slack notification if configured

@@ -15,7 +15,7 @@ export class OrganizationService {
 
     // First get the membership records
     const { data: memberships, error: membershipError } = await supabase
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('organization_id')
       .eq('user_id', user.id)
 
@@ -31,7 +31,7 @@ export class OrganizationService {
     // Then fetch the organizations
     const orgIds = memberships.map(m => m.organization_id)
     const { data: organizations, error: orgError } = await supabase
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .select('*')
       .in('id', orgIds)
 
@@ -72,7 +72,7 @@ export class OrganizationService {
     console.log('[OrgService] Creating new organization for:', username)
 
     const { data: org, error } = await supabase
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .insert({
         name: `${username}'s Workspace`,
         slug: slug,
@@ -92,7 +92,7 @@ export class OrganizationService {
     // Add user as owner of the organization
     console.log('[OrgService] Adding user as owner...')
     const { error: memberError } = await supabase
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .insert({
         organization_id: org.id,
         user_id: user.id,
@@ -114,7 +114,7 @@ export class OrganizationService {
     if (!user) throw new Error('User not authenticated')
 
     const { data: org, error } = await supabase
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .insert({
         ...data,
         created_by: user.id,
@@ -126,7 +126,7 @@ export class OrganizationService {
 
     // Add creator as owner
     await supabase
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .insert({
         organization_id: org.id,
         user_id: user.id,
@@ -139,7 +139,7 @@ export class OrganizationService {
   // Get an organization by ID
   static async getOrganization(orgId: string): Promise<Organization | null> {
     const { data, error } = await supabase
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .select('*')
       .eq('id', orgId)
       .single()

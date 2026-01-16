@@ -93,7 +93,7 @@ export class TaskService {
   // Get a single task with all details
   static async getTask(taskId: string): Promise<TaskWithDetails | null> {
     const { data: task, error: taskError } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select(`
         *,
         project:projects(id, name, color, workflow_stages)
@@ -108,19 +108,19 @@ export class TaskService {
 
     // Get assignees - fetch assignments first, then profiles
     const { data: assignments } = await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .select('user_id')
       .eq('task_id', taskId)
 
     const assigneeIds = assignments?.map(a => a.user_id) || []
     const { data: assigneeProfiles } = assigneeIds.length > 0 ? await supabase
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', assigneeIds) : { data: [] }
 
     // Get subtasks
     const { data: subtasksData } = await supabase
-      .from('TODOAAPP.subtasks')
+      .from('subtasks')
       .select('*')
       .eq('task_id', taskId)
       .order('created_at', { ascending: true })
@@ -128,7 +128,7 @@ export class TaskService {
     // Get assignee profiles for subtasks
     const subtaskAssigneeIds = [...new Set(subtasksData?.filter(s => s.assigned_to).map(s => s.assigned_to) || [])]
     const { data: subtaskAssigneeProfiles } = subtaskAssigneeIds.length > 0 ? await supabase
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', subtaskAssigneeIds) : { data: [] }
 
@@ -140,19 +140,19 @@ export class TaskService {
 
     // Get attachments
     const { data: attachments } = await supabase
-      .from('TODOAAPP.attachments')
+      .from('attachments')
       .select('*')
       .eq('task_id', taskId)
 
     // Get time entries
     const { data: timeEntries } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select('*')
       .eq('task_id', taskId)
 
     // Get comments count
     const { count: commentsCount } = await supabase
-      .from('TODOAAPP.comments')
+      .from('comments')
       .select('*', { count: 'exact', head: true })
       .eq('task_id', taskId)
 
@@ -243,7 +243,7 @@ export class TaskService {
     // Update all tasks in the stage with new positions
     const updates = taskIds.map((taskId, index) =>
       supabase
-        .from('TODOAAPP.tasks')
+        .from('tasks')
         .update({ position: index })
         .eq('id', taskId)
         .eq('project_id', projectId)
@@ -260,7 +260,7 @@ export class TaskService {
 
     // Remove existing assignments
     await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .delete()
       .eq('task_id', taskId)
 
@@ -269,7 +269,7 @@ export class TaskService {
       await Promise.all(
         userIds.map(userId =>
           supabase
-            .from('TODOAAPP.task_assignments')
+            .from('task_assignments')
             .insert({
               task_id: taskId,
               user_id: userId,
@@ -283,7 +283,7 @@ export class TaskService {
   // Create subtask
   static async createSubtask(taskId: string, title: string): Promise<Subtask> {
     const { data, error } = await supabase
-      .from('TODOAAPP.subtasks')
+      .from('subtasks')
       .insert({
         task_id: taskId,
         title,
@@ -298,7 +298,7 @@ export class TaskService {
   // Update subtask
   static async updateSubtask(subtaskId: string, updates: Partial<Subtask>): Promise<Subtask> {
     const { data, error } = await supabase
-      .from('TODOAAPP.subtasks')
+      .from('subtasks')
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
@@ -314,7 +314,7 @@ export class TaskService {
   // Delete subtask
   static async deleteSubtask(subtaskId: string): Promise<void> {
     const { error } = await supabase
-      .from('TODOAAPP.subtasks')
+      .from('subtasks')
       .delete()
       .eq('id', subtaskId)
 
@@ -327,7 +327,7 @@ export class TaskService {
     if (!user) throw new Error('User not authenticated')
 
     const { data: comment, error } = await supabase
-      .from('TODOAAPP.comments')
+      .from('comments')
       .insert({
         ...data,
         created_by: user.id,
@@ -342,7 +342,7 @@ export class TaskService {
   // Get comments for a task
   static async getTaskComments(taskId: string): Promise<Comment[]> {
     const { data, error } = await supabase
-      .from('TODOAAPP.comments')
+      .from('comments')
       .select(`
         *,
         user:profiles(id, full_name, email, avatar_url)
@@ -364,7 +364,7 @@ export class TaskService {
     if (!user) throw new Error('User not authenticated')
 
     const { data, error } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .insert({
         task_id: taskId,
         user_id: user.id,
@@ -390,7 +390,7 @@ export class TaskService {
     }
   ): Promise<Task[]> {
     let dbQuery = supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('*')
       .eq('project_id', projectId)
       .neq('status', 'archived')
@@ -400,7 +400,7 @@ export class TaskService {
     if (filters?.assignee_id) {
       // First get the task IDs assigned to this user
       const { data: assignments } = await supabase
-        .from('TODOAAPP.task_assignments')
+        .from('task_assignments')
         .select('task_id')
         .eq('user_id', filters.assignee_id)
 

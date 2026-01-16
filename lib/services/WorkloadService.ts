@@ -48,7 +48,7 @@ export class WorkloadService {
 
     // Get project members (without JOIN to avoid issues)
     const { data: members } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('user_id')
       .eq('project_id', projectId)
 
@@ -59,7 +59,7 @@ export class WorkloadService {
     // Get profiles for all members separately
     const memberUserIds = members.map(m => m.user_id)
     const { data: profiles } = await supabase
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', memberUserIds)
 
@@ -68,14 +68,14 @@ export class WorkloadService {
     // Get task assignments with task details
     // First get all assignments for project members
     const { data: assignments } = await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .select('user_id, task_id')
       .in('user_id', memberUserIds)
 
     // Get all tasks that are assigned
     const taskIds = [...new Set(assignments?.map(a => a.task_id) || [])]
     const { data: assignedTasks } = taskIds.length > 0 ? await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('id, title, project_id, due_date, start_date, estimated_hours, priority, stage_id')
       .in('id', taskIds) : { data: [] }
 
@@ -83,7 +83,7 @@ export class WorkloadService {
 
     // Get project info for filtering
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
@@ -94,7 +94,7 @@ export class WorkloadService {
 
     // Get all projects for names/colors
     const { data: projects } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id, name, color')
 
     const projectMap = new Map(projects?.map(p => [p.id, p]) || [])
@@ -204,7 +204,7 @@ export class WorkloadService {
   }> {
     // Get user's task assignments
     const { data: assignments } = await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .select('task_id')
       .eq('user_id', userId)
 
@@ -220,14 +220,14 @@ export class WorkloadService {
     // Get the tasks
     const taskIds = assignments.map(a => a.task_id)
     const { data: tasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('id, project_id, stage_id, due_date, estimated_hours')
       .in('id', taskIds)
 
     // Get all projects for those tasks
     const projectIds = [...new Set(tasks?.map(t => t.project_id) || [])]
     const { data: projects } = projectIds.length > 0 ? await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id, name, workflow_stages')
       .in('id', projectIds) : { data: [] }
 

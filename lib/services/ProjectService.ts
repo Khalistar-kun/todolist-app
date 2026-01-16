@@ -85,7 +85,7 @@ export class ProjectService {
 
     // Check if the provided organization_id is valid
     const { data: existingOrg, error: orgCheckError } = await supabase
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .select('id')
       .eq('id', organizationId)
       .single()
@@ -99,7 +99,7 @@ export class ProjectService {
       const slug = `${username}-workspace-${Date.now()}`
 
       const { data: newOrg, error: createOrgError } = await supabase
-        .from('TODOAAPP.organizations')
+        .from('organizations')
         .insert({
           name: `${username}'s Workspace`,
           slug: slug,
@@ -118,7 +118,7 @@ export class ProjectService {
 
       // Add user as organization owner
       const { error: memberError } = await supabase
-        .from('TODOAAPP.organization_members')
+        .from('organization_members')
         .insert({
           organization_id: organizationId,
           user_id: user.id,
@@ -132,7 +132,7 @@ export class ProjectService {
 
     // Create the project
     const { data: project, error } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .insert({
         ...data,
         organization_id: organizationId,
@@ -148,7 +148,7 @@ export class ProjectService {
 
     // Add creator as project owner
     const { error: projectMemberError } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .insert({
         project_id: project.id,
         user_id: user.id,
@@ -165,7 +165,7 @@ export class ProjectService {
   // Update a project
   static async updateProject(projectId: string, data: UpdateProjectData): Promise<Project> {
     const { data: project, error } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .update({
         ...data,
         updated_at: new Date().toISOString(),
@@ -181,7 +181,7 @@ export class ProjectService {
   // Delete a project
   static async deleteProject(projectId: string): Promise<void> {
     const { error } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .delete()
       .eq('id', projectId)
 
@@ -198,7 +198,7 @@ export class ProjectService {
     if (!user) throw new Error('User not authenticated')
 
     const { error } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .insert({
         project_id: projectId,
         user_id: userId,
@@ -216,7 +216,7 @@ export class ProjectService {
     role: 'owner' | 'admin' | 'editor' | 'reader'
   ): Promise<void> {
     const { error } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .update({ role })
       .eq('project_id', projectId)
       .eq('user_id', userId)
@@ -227,7 +227,7 @@ export class ProjectService {
   // Remove a member from a project
   static async removeMember(projectId: string, userId: string): Promise<void> {
     const { error } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .delete()
       .eq('project_id', projectId)
       .eq('user_id', userId)
@@ -238,7 +238,7 @@ export class ProjectService {
   // Get project members
   static async getProjectMembers(projectId: string) {
     const { data, error } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select(`
         *,
         user:profiles(id, full_name, email, avatar_url)
@@ -253,7 +253,7 @@ export class ProjectService {
   // Check if user is a member of a project
   static async isMember(projectId: string, userId: string): Promise<boolean> {
     const { data, error } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('id')
       .eq('project_id', projectId)
       .eq('user_id', userId)
@@ -270,7 +270,7 @@ export class ProjectService {
   // Get user's role in a project
   static async getUserRole(projectId: string, userId: string): Promise<'owner' | 'admin' | 'editor' | 'reader' | null> {
     const { data, error } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', userId)

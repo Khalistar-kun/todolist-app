@@ -180,7 +180,7 @@ export class RecurringTaskService {
   static async getUserRecurringTasks(userId: string): Promise<RecurringTaskWithDetails[]> {
     // First get all projects the user is a member of
     const { data: memberships } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('project_id')
       .eq('user_id', userId)
 

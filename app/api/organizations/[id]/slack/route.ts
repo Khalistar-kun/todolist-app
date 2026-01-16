@@ -54,7 +54,7 @@ export async function GET(
 
     // Verify user is a member of the organization
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -125,7 +125,7 @@ export async function POST(
 
     // Verify user is an admin or owner of the organization
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -141,7 +141,7 @@ export async function POST(
 
     // Get organization name for the test message
     const { data: orgData } = await supabaseAdmin
-      .from('TODOAAPP.organizations')
+      .from('organizations')
       .select('name')
       .eq('id', organizationId)
       .single()
@@ -262,7 +262,7 @@ export async function DELETE(
 
     // Verify user is an admin or owner of the organization
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)

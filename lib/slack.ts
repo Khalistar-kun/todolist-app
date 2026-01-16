@@ -536,7 +536,7 @@ export async function getSlackConfig(
   try {
     // First, try to get project-level Slack integration
     const { data: projectConfig, error: projectError } = await supabase
-      .from('TODOAAPP.slack_integrations')
+      .from('slack_integrations')
       .select('access_token, channel_id, channel_name')
       .eq('project_id', projectId)
       .single()
@@ -552,7 +552,7 @@ export async function getSlackConfig(
     // Fall back to organization-level Slack integration
     // First get the project's organization_id
     const { data: project, error: projFetchError } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('organization_id')
       .eq('id', projectId)
       .single()
@@ -603,7 +603,7 @@ export async function updateTaskSlackThread(
     }
 
     await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .update(updates)
       .eq('id', taskId)
   } catch (error) {

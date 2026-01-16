@@ -71,7 +71,7 @@ export class ReportingService {
    */
   static async getProjectStats(projectId: string): Promise<ProjectStats> {
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id, name, color, workflow_stages')
       .eq('id', projectId)
       .single()
@@ -79,7 +79,7 @@ export class ReportingService {
     if (!project) throw new Error('Project not found')
 
     const { data: tasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('id, stage_id, approval_status, due_date, completed_at, created_at')
       .eq('project_id', projectId)
       .is('parent_task_id', null)
@@ -132,7 +132,7 @@ export class ReportingService {
    */
   static async getTeamMemberStats(projectId: string): Promise<TeamMemberStats[]> {
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
@@ -145,7 +145,7 @@ export class ReportingService {
 
     // Get all task assignments for the project
     const { data: assignments } = await supabase
-      .from('TODOAAPP.task_assignments')
+      .from('task_assignments')
       .select(`
         user_id,
         task:tasks (
@@ -162,14 +162,14 @@ export class ReportingService {
 
     // Get member info (without JOIN to avoid issues)
     const { data: members } = await supabase
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('user_id')
       .eq('project_id', projectId)
 
     // Fetch profiles separately
     const memberUserIds = members?.map(m => m.user_id) || []
     const { data: profiles } = await supabase
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', memberUserIds)
 
@@ -246,7 +246,7 @@ export class ReportingService {
     endDate: Date
   ): Promise<DailyStats[]> {
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
@@ -256,7 +256,7 @@ export class ReportingService {
     const doneStageId = doneStage?.id || 'done'
 
     const { data: tasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('created_at, completed_at, due_date, stage_id, approval_status')
       .eq('project_id', projectId)
       .gte('created_at', startDate.toISOString())
@@ -308,13 +308,13 @@ export class ReportingService {
    */
   static async getStageDistribution(projectId: string): Promise<StageDistribution[]> {
     const { data: project } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
 
     const { data: tasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('stage_id')
       .eq('project_id', projectId)
       .is('parent_task_id', null)
@@ -339,7 +339,7 @@ export class ReportingService {
    */
   static async getPriorityDistribution(projectId: string): Promise<PriorityDistribution[]> {
     const { data: tasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('priority')
       .eq('project_id', projectId)
       .is('parent_task_id', null)
@@ -385,7 +385,7 @@ export class ReportingService {
     milestoneId?: string
   ): Promise<BurndownData[]> {
     let query = supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('id, created_at, completed_at')
       .eq('project_id', projectId)
       .is('parent_task_id', null)
@@ -435,7 +435,7 @@ export class ReportingService {
     endDate: Date
   ): Promise<TimeReport> {
     const { data: entries } = await supabase
-      .from('TODOAAPP.time_entries')
+      .from('time_entries')
       .select(`
         id,
         user_id,
@@ -504,7 +504,7 @@ export class ReportingService {
     completion_rate: number
   }> {
     const { data: projects } = await supabase
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('id')
       .eq('organization_id', organizationId)
 
@@ -521,18 +521,18 @@ export class ReportingService {
     }
 
     const { count: totalTasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('*', { count: 'exact', head: true })
       .in('project_id', projectIds)
 
     const { count: completedTasks } = await supabase
-      .from('TODOAAPP.tasks')
+      .from('tasks')
       .select('*', { count: 'exact', head: true })
       .in('project_id', projectIds)
       .eq('approval_status', 'approved')
 
     const { count: activeMembers } = await supabase
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('*', { count: 'exact', head: true })
       .eq('organization_id', organizationId)
 

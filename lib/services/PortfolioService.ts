@@ -73,7 +73,7 @@ export class PortfolioService {
 
         // Get task counts
         const { data: tasks } = await supabase
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .select('id, stage_id, approval_status, due_date')
           .eq('project_id', project.id)
           .is('parent_task_id', null) // Only count top-level tasks
@@ -102,7 +102,7 @@ export class PortfolioService {
 
         // Get member count
         const { count: membersCount } = await supabase
-          .from('TODOAAPP.project_members')
+          .from('project_members')
           .select('*', { count: 'exact', head: true })
           .eq('project_id', project.id)
 

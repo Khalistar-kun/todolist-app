@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Step 1: Check if user already has an organization
     console.log('[API] Checking for existing organization for user:', user.id)
     const { data: existingMembership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('organization_id')
       .eq('user_id', user.id)
       .limit(1)
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       const slug = `${username}-workspace-${Date.now()}`
 
       const { data: newOrg, error: createOrgError } = await supabaseAdmin
-        .from('TODOAAPP.organizations')
+        .from('organizations')
         .insert({
           name: `${username}'s Workspace`,
           slug: slug,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
       // Step 3: Add user as organization owner
       const { error: orgMemberError } = await supabaseAdmin
-        .from('TODOAAPP.organization_members')
+        .from('organization_members')
         .insert({
           organization_id: finalOrgId,
           user_id: user.id,
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     // Step 4: Create the project
     console.log('[API] Creating project in organization:', finalOrgId, 'team:', team_id || 'none')
     const { data: project, error: projectError } = await supabaseAdmin
-      .from('TODOAAPP.projects')
+      .from('projects')
       .insert({
         name,
         description: description || null,
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     // Step 5: Add user as project owner
     const { error: projectMemberError } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .insert({
         project_id: project.id,
         user_id: user.id,
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's projects using admin client
     const { data: memberships, error: membershipError } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select(`
         project_id,
         role,
@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
       rawProjects.map(async (project: any) => {
         // Get all tasks for this project
         const { data: tasks } = await supabaseAdmin
-          .from('TODOAAPP.tasks')
+          .from('tasks')
           .select('stage_id, approval_status')
           .eq('project_id', project.id)
 

@@ -61,7 +61,7 @@ export async function POST(
 
     // Get team to find organization
     const { data: team } = await supabaseAdmin
-      .from('TODOAAPP.teams')
+      .from('teams')
       .select('organization_id')
       .eq('id', teamId)
       .single()
@@ -72,7 +72,7 @@ export async function POST(
 
     // Check current user has permission
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('role')
       .eq('team_id', teamId)
       .eq('user_id', user.id)
@@ -84,7 +84,7 @@ export async function POST(
 
     // Verify target user is in the organization
     const { data: targetOrgMembership } = await supabaseAdmin
-      .from('TODOAAPP.organization_members')
+      .from('organization_members')
       .select('id')
       .eq('organization_id', team.organization_id)
       .eq('user_id', user_id)
@@ -96,7 +96,7 @@ export async function POST(
 
     // Check if already a member
     const { data: existingMember } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('id')
       .eq('team_id', teamId)
       .eq('user_id', user_id)
@@ -108,7 +108,7 @@ export async function POST(
 
     // Add member
     const { data: newMember, error: insertError } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .insert({
         team_id: teamId,
         user_id,
@@ -160,7 +160,7 @@ export async function DELETE(
 
     // Check current user has permission (or is removing themselves)
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('role')
       .eq('team_id', teamId)
       .eq('user_id', user.id)
@@ -176,7 +176,7 @@ export async function DELETE(
     // Don't allow removing the last owner
     if (!isSelf) {
       const { data: targetMember } = await supabaseAdmin
-        .from('TODOAAPP.team_members')
+        .from('team_members')
         .select('role')
         .eq('team_id', teamId)
         .eq('user_id', targetUserId)
@@ -184,7 +184,7 @@ export async function DELETE(
 
       if (targetMember?.role === 'owner') {
         const { count } = await supabaseAdmin
-          .from('TODOAAPP.team_members')
+          .from('team_members')
           .select('id', { count: 'exact', head: true })
           .eq('team_id', teamId)
           .eq('role', 'owner')
@@ -197,7 +197,7 @@ export async function DELETE(
 
     // Remove member
     const { error: deleteError } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .delete()
       .eq('team_id', teamId)
       .eq('user_id', targetUserId)
@@ -243,7 +243,7 @@ export async function PATCH(
 
     // Check current user is owner
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .select('role')
       .eq('team_id', teamId)
       .eq('user_id', user.id)
@@ -255,7 +255,7 @@ export async function PATCH(
 
     // Update role
     const { data: updatedMember, error: updateError } = await supabaseAdmin
-      .from('TODOAAPP.team_members')
+      .from('team_members')
       .update({ role })
       .eq('team_id', teamId)
       .eq('user_id', user_id)

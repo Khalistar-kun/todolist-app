@@ -72,7 +72,7 @@ export async function GET(
 
     // Verify user is a member of the project
     const { data: membership } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -84,7 +84,7 @@ export async function GET(
 
     // Get all members with their profiles
     const { data: members, error } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('id, user_id, role, joined_at')
       .eq('project_id', projectId)
       .order('joined_at', { ascending: true })
@@ -98,7 +98,7 @@ export async function GET(
     const membersWithProfiles = await Promise.all(
       (members || []).map(async (member) => {
         const { data: profile } = await supabaseAdmin
-          .from('TODOAAPP.profiles')
+          .from('profiles')
           .select('id, full_name, email, avatar_url')
           .eq('id', member.user_id)
           .single()
@@ -197,7 +197,7 @@ export async function POST(
 
     // Check current user's role
     const { data: currentMembership } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -217,14 +217,14 @@ export async function POST(
 
     // Get project info for the invitation email
     const { data: project } = await supabaseAdmin
-      .from('TODOAAPP.projects')
+      .from('projects')
       .select('name')
       .eq('id', projectId)
       .single()
 
     // Get inviter's profile
     const { data: inviterProfile } = await supabaseAdmin
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('full_name, email')
       .eq('id', user.id)
       .single()
@@ -234,7 +234,7 @@ export async function POST(
 
     // Find the user by email in profiles
     const { data: targetProfile } = await supabaseAdmin
-      .from('TODOAAPP.profiles')
+      .from('profiles')
       .select('id, email, full_name')
       .eq('email', email)
       .single()
@@ -243,7 +243,7 @@ export async function POST(
       // User exists with a profile - add them directly
       // Check if user is already a member
       const { data: existingMember } = await supabaseAdmin
-        .from('TODOAAPP.project_members')
+        .from('project_members')
         .select('id')
         .eq('project_id', projectId)
         .eq('user_id', targetProfile.id)
@@ -255,7 +255,7 @@ export async function POST(
 
       // Add the member directly
       const { data: newMember, error: insertError } = await supabaseAdmin
-        .from('TODOAAPP.project_members')
+        .from('project_members')
         .insert({
           project_id: projectId,
           user_id: targetProfile.id,
@@ -272,7 +272,7 @@ export async function POST(
       console.log(`[API] Added member ${targetProfile.email} to project ${projectId} as ${role}`)
 
       // Create a notification for the added user
-      await supabaseAdmin.from('TODOAAPP.notifications').insert({
+      await supabaseAdmin.from('notifications').insert({
         user_id: targetProfile.id,
         type: 'project_invite',
         title: 'Added to project',
@@ -393,7 +393,7 @@ export async function PATCH(
 
     // Check current user's role
     const { data: currentMembership } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -409,7 +409,7 @@ export async function PATCH(
 
     // Get target member's current role
     const { data: targetMembership } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user_id)
@@ -436,7 +436,7 @@ export async function PATCH(
       }
       // When transferring ownership, demote current owner to admin
       await supabaseAdmin
-        .from('TODOAAPP.project_members')
+        .from('project_members')
         .update({ role: 'admin' })
         .eq('project_id', projectId)
         .eq('user_id', user.id)
@@ -444,7 +444,7 @@ export async function PATCH(
 
     // Update the member's role
     const { data: updatedMember, error: updateError } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .update({ role })
       .eq('project_id', projectId)
       .eq('user_id', user_id)
@@ -490,7 +490,7 @@ export async function DELETE(
 
     // Check current user's role
     const { data: currentMembership } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -509,7 +509,7 @@ export async function DELETE(
 
     // Get target member's role
     const { data: targetMembership } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', targetUserId)
@@ -522,7 +522,7 @@ export async function DELETE(
     // Cannot remove the last owner
     if (targetMembership.role === 'owner') {
       const { data: owners } = await supabaseAdmin
-        .from('TODOAAPP.project_members')
+        .from('project_members')
         .select('id')
         .eq('project_id', projectId)
         .eq('role', 'owner')
@@ -545,7 +545,7 @@ export async function DELETE(
 
     // Remove the member
     const { error: deleteError } = await supabaseAdmin
-      .from('TODOAAPP.project_members')
+      .from('project_members')
       .delete()
       .eq('project_id', projectId)
       .eq('user_id', targetUserId)
