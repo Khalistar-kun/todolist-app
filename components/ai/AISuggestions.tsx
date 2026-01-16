@@ -14,8 +14,10 @@ interface ProjectMember {
     email?: string
   }
   user?: {
-    email?: string
-    full_name?: string
+    id: string
+    email: string
+    full_name: string | null
+    avatar_url: string | null
   }
 }
 
