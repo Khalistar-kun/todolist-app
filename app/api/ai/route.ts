@@ -8,6 +8,12 @@ import {
   suggestTaskCompletion,
   generateProgressSummary,
   chatCompletion,
+  parseNaturalLanguageTask,
+  breakdownLargeTask,
+  generateAcceptanceCriteria,
+  estimateTaskDuration,
+  suggestTaskAssignment,
+  improveTaskClarity,
   type ChatMessage,
 } from '@/lib/services/GroqService'
 
@@ -73,12 +79,66 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'analyze-task': {
-        const { title, description, projectContext } = params
+        const { title, description, projectContext, existingTasks, teamMembers } = params
         if (!title) {
           return NextResponse.json({ error: 'Task title is required' }, { status: 400 })
         }
-        const analysis = await analyzeTask(title, description, projectContext)
+        const analysis = await analyzeTask(title, description, projectContext, existingTasks, teamMembers)
         return NextResponse.json(analysis)
+      }
+
+      case 'parse-natural-language': {
+        const { input, projectContext } = params
+        if (!input) {
+          return NextResponse.json({ error: 'Input text is required' }, { status: 400 })
+        }
+        const parsed = await parseNaturalLanguageTask(input, projectContext)
+        return NextResponse.json(parsed)
+      }
+
+      case 'breakdown-task': {
+        const { title, description, desiredSubtaskCount } = params
+        if (!title) {
+          return NextResponse.json({ error: 'Task title is required' }, { status: 400 })
+        }
+        const subtasks = await breakdownLargeTask(title, description, desiredSubtaskCount)
+        return NextResponse.json({ subtasks })
+      }
+
+      case 'generate-acceptance-criteria': {
+        const { title, description, userStory } = params
+        if (!title) {
+          return NextResponse.json({ error: 'Task title is required' }, { status: 400 })
+        }
+        const criteria = await generateAcceptanceCriteria(title, description, userStory)
+        return NextResponse.json({ criteria })
+      }
+
+      case 'estimate-duration': {
+        const { title, description, similarTasks } = params
+        if (!title) {
+          return NextResponse.json({ error: 'Task title is required' }, { status: 400 })
+        }
+        const estimate = await estimateTaskDuration(title, description, similarTasks)
+        return NextResponse.json(estimate)
+      }
+
+      case 'suggest-assignment': {
+        const { title, description, teamMembers } = params
+        if (!title) {
+          return NextResponse.json({ error: 'Task title is required' }, { status: 400 })
+        }
+        const suggestions = await suggestTaskAssignment(title, description, teamMembers)
+        return NextResponse.json({ suggestions })
+      }
+
+      case 'improve-clarity': {
+        const { title, description } = params
+        if (!title) {
+          return NextResponse.json({ error: 'Task title is required' }, { status: 400 })
+        }
+        const improved = await improveTaskClarity(title, description)
+        return NextResponse.json(improved)
       }
 
       case 'project-insights': {
