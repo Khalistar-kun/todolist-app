@@ -467,6 +467,9 @@ export function TaskModal({
               <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
                 {readOnly ? 'View Task' : isEditing ? 'Edit Task' : 'Create Task'}
               </Dialog.Title>
+              <Dialog.Description className="sr-only">
+                {readOnly ? 'View task details and information' : isEditing ? 'Edit task details including title, description, priority, and assignments' : 'Create a new task with title, description, priority, due date, and team assignments'}
+              </Dialog.Description>
               {/* Voice Edit Button - Only show when editing and not in read-only mode */}
               {isEditing && !readOnly && (
                 <VoiceEditButton
