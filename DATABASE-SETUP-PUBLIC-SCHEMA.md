@@ -14,17 +14,32 @@ This project follows a strict architecture mandate:
 ## Files Included
 
 ### 1. `create-public-schema-tables.sql`
-Creates all 19 tables in the public schema with:
+Creates the 19 core tables in the public schema with:
 - 7 enum types (task_priority, task_status, project_role, etc.)
-- 19 tables (profiles, organizations, projects, tasks, etc.)
+- 19 core tables (profiles, organizations, projects, tasks, etc.)
 - All necessary indexes for optimal performance
 - RLS enabled on all tables
 
 ### 2. `create-public-schema-rls.sql`
-Creates Row Level Security policies for all tables:
-- 49 total RLS policies
+Creates Row Level Security policies for core tables:
+- 49 RLS policies for core tables
 - Proper access control based on user roles
 - Protects multi-tenant data separation
+
+### 3. `create-missing-tables.sql`
+Creates 6 additional tables used by various features:
+- user_preferences (settings and preferences)
+- password_reset_pins (password reset flow)
+- project_invitations (invitation management)
+- org_slack_integrations (organization Slack settings)
+- organization_announcements (org-wide announcements)
+- organization_meetings (meeting schedules)
+
+### 4. `create-missing-tables-rls.sql`
+Creates RLS policies for additional tables:
+- 20 RLS policies
+- Secure access control for each feature
+- Integration with existing security model
 
 ## Setup Instructions
 
@@ -33,7 +48,7 @@ Creates Row Level Security policies for all tables:
 - Access to Supabase SQL Editor
 - Service role key configured in `.env.local`
 
-### Step 1: Create Tables
+### Step 1: Create Core Tables
 
 1. Go to your Supabase Dashboard
 2. Navigate to **SQL Editor**
@@ -47,9 +62,9 @@ Expected output:
 🔒 Row Level Security enabled on all tables
 ```
 
-### Step 2: Apply RLS Policies
+### Step 2: Apply Core RLS Policies
 
-1. In the same SQL Editor
+1. In the SQL Editor, create a new query
 2. Copy the contents of `create-public-schema-rls.sql`
 3. Paste into SQL Editor and click **RUN**
 
@@ -59,7 +74,32 @@ Expected output:
 🔒 All 19 tables are now protected with Row Level Security
 ```
 
-### Step 3: Verify Setup
+### Step 3: Create Additional Tables
+
+1. In the SQL Editor, create a new query
+2. Copy the contents of `create-missing-tables.sql`
+3. Paste into SQL Editor and click **RUN**
+
+Expected output:
+```
+✅ Additional tables created successfully!
+📊 Created 6 additional tables
+🔒 RLS enabled on all tables
+```
+
+### Step 4: Apply Additional RLS Policies
+
+1. In the SQL Editor, create a new query
+2. Copy the contents of `create-missing-tables-rls.sql`
+3. Paste into SQL Editor and click **RUN**
+
+Expected output:
+```
+✅ RLS policies for additional tables created successfully!
+✨ Total: 20 additional RLS policies created
+```
+
+### Step 5: Verify Setup
 
 Run the health check endpoint:
 
@@ -85,7 +125,7 @@ Expected response:
 
 ## Database Schema
 
-### Tables Created (19 total)
+### Core Tables (19 tables)
 
 #### 1. User Management
 - `profiles` - User profiles and settings
@@ -119,6 +159,24 @@ Expected response:
 #### 7. Integrations
 - `webhooks` - Webhook configurations
 - `slack_integrations` - Slack bot integration settings
+
+### Additional Tables (6 tables)
+
+#### 8. User Preferences & Settings
+- `user_preferences` - User settings (theme, notifications, language, timezone)
+
+#### 9. Authentication & Security
+- `password_reset_pins` - Temporary PINs for password reset flow
+
+#### 10. Invitation Management
+- `project_invitations` - Project membership invitation tracking
+
+#### 11. Organization Features
+- `org_slack_integrations` - Organization-level Slack integration
+- `organization_announcements` - Organization-wide announcements
+- `organization_meetings` - Meeting schedules and details
+
+**Total: 25 tables**
 
 ## Key Features
 
@@ -244,8 +302,10 @@ For issues or questions:
 ## Architecture Files
 
 Related documentation:
-- `create-public-schema-tables.sql` - Complete table definitions
-- `create-public-schema-rls.sql` - Complete RLS policies
+- `create-public-schema-tables.sql` - Core table definitions (19 tables)
+- `create-public-schema-rls.sql` - Core RLS policies (49 policies)
+- `create-missing-tables.sql` - Additional table definitions (6 tables)
+- `create-missing-tables-rls.sql` - Additional RLS policies (20 policies)
 - `app/api/health/route.ts` - Health check endpoint
 - `TODOAAPP-TABLES.md` - Original schema documentation (for reference only)
 
@@ -253,5 +313,5 @@ Related documentation:
 
 **Last Updated**: 2026-01-16
 **Schema Version**: 1.0.0 (Public Schema)
-**Total Tables**: 19
-**Total RLS Policies**: 49
+**Total Tables**: 25 (19 core + 6 additional)
+**Total RLS Policies**: 69 (49 core + 20 additional)
