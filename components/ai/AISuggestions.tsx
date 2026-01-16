@@ -11,6 +11,11 @@ interface ProjectMember {
   profile?: {
     full_name?: string
     avatar_url?: string
+    email?: string
+  }
+  user?: {
+    email?: string
+    full_name?: string
   }
 }
 
@@ -424,9 +429,13 @@ Only return the date in YYYY-MM-DD format, nothing else. If you cannot parse the
       ? `Current quests:\n${visibleSuggestions.map(s => `- ${s.title}: ${s.description}`).join('\n')}`
       : 'No active quests'
 
-    // Include member names for task assignment
+    // Include member names and emails for task assignment
     const membersList = members.length > 0
-      ? `Team members:\n${members.map(m => `- ${m.profile?.full_name || 'Unknown'} (ID: ${m.user_id})`).join('\n')}`
+      ? `Team members:\n${members.map(m => {
+          const name = m.profile?.full_name || m.user?.full_name || 'Unknown'
+          const email = m.profile?.email || m.user?.email || ''
+          return `- ${name}${email ? ` (${email})` : ''} [ID: ${m.user_id}]`
+        }).join('\n')}`
       : 'No team members'
 
     return `Project: ${projectName || 'Unknown'}
@@ -465,15 +474,26 @@ Guidelines:
 - Suggest practical next steps
 - Help with task planning and prioritization
 
-TASK CREATION:
+TASK CREATION AND ASSIGNMENT:
 When the user asks you to create a task or assign someone to a task, respond with a JSON block in this exact format:
 \`\`\`json
 {"action":"create_task","title":"Task title","description":"Optional description","priority":"medium","assignees":["user_id_here"]}
 \`\`\`
-- Use the team member IDs from the context above for assignees
-- Priority can be: low, medium, high, urgent
-- Always confirm with the user before creating tasks
-- You can assign multiple members by adding multiple IDs to the assignees array`
+
+IMPORTANT RULES:
+- Use the exact user IDs from the "Team members" list above for the assignees array
+- Match member names flexibly (e.g., "John" matches "John Doe", "john.doe@email.com")
+- Priority options: low, medium, high, urgent
+- You can assign multiple members by adding multiple IDs to the assignees array
+- If the user says "assign to [name]" or "give this to [name]", find the matching member and include their ID
+- Always confirm task details before creating
+
+EXAMPLES:
+User: "Create a task to review the code and assign it to John"
+Response: Include John's user_id in the assignees array
+
+User: "New task: fix the bug. Give it to Sarah and Mike"
+Response: Include both Sarah's and Mike's user_ids in the assignees array`
             },
             ...chatHistory.map(msg => ({ role: msg.role, content: msg.content })),
             { role: 'user', content: userMessage }
