@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     if (projectId) {
       // Verify user is a member of the project
       const { data: membership } = await supabaseAdmin
-        .from('project_members')
+        .from('TODOAAPP.project_members')
         .select('id')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
       // Get project member user_ids (excluding current user)
       const { data: members, error: membersError } = await supabaseAdmin
-        .from('project_members')
+        .from('TODOAAPP.project_members')
         .select('user_id')
         .eq('project_id', projectId)
         .neq('user_id', user.id)
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 
       // Fetch profiles for these users
       const { data: profiles, error: profilesError } = await supabaseAdmin
-        .from('profiles')
+        .from('TODOAAPP.profiles')
         .select('id, full_name, email, avatar_url')
         .in('id', memberUserIds)
 
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     // Get all project_ids user is a member of
     const { data: userProjects } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('project_id')
       .eq('user_id', user.id)
 
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
 
     // Get all user_ids in those projects (excluding current user)
     const { data: fellowMembers, error: membersError } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('user_id')
       .in('project_id', projectIds)
       .neq('user_id', user.id)
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch profiles for these users
     const { data: profiles, error: profilesError } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('id, full_name, email, avatar_url')
       .in('id', uniqueUserIds)
 

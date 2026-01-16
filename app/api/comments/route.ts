@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     // Get comments with author info
     const { data: comments, error } = await supabaseAdmin
-      .from('comments')
+      .from('TODOAAPP.comments')
       .select(`
         *,
         author:profiles!created_by(id, full_name, avatar_url)
@@ -91,7 +91,7 @@ async function resolveMentionsToUserIds(
 
   // Get all project members
   const { data: members } = await supabaseAdmin
-    .from('project_members')
+    .from('TODOAAPP.project_members')
     .select('user_id')
     .eq('project_id', projectId)
 
@@ -101,7 +101,7 @@ async function resolveMentionsToUserIds(
 
   // Get profiles for these users
   const { data: profiles } = await supabaseAdmin
-    .from('profiles')
+    .from('TODOAAPP.profiles')
     .select('id, full_name, email')
     .in('id', memberUserIds)
 
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
 
     // Verify user is a member of the project
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('id, role')
       .eq('project_id', project_id)
       .eq('user_id', user.id)
@@ -175,14 +175,14 @@ export async function POST(request: NextRequest) {
 
     // Get task info for notification
     const { data: task } = await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('title')
       .eq('id', task_id)
       .single()
 
     // Get commenter's profile
     const { data: commenterProfile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('full_name, avatar_url')
       .eq('id', user.id)
       .single()
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     // Create the comment
     const { data: comment, error: commentError } = await supabaseAdmin
-      .from('comments')
+      .from('TODOAAPP.comments')
       .insert({
         task_id,
         project_id,
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
 
     // Get project name for notification
     const { data: project } = await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('name')
       .eq('id', project_id)
       .single()
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
 
         // Create mention record in the mentions table
         const { error: mentionError } = await supabaseAdmin
-          .from('mentions')
+          .from('TODOAAPP.mentions')
           .insert({
             mentioned_user_id: mentionedUserId,
             mentioner_user_id: user.id,
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
 
         // Create attention item for the mentioned user
         const { error: attentionError } = await supabaseAdmin
-          .from('attention_items')
+          .from('TODOAAPP.attention_items')
           .insert({
             user_id: mentionedUserId,
             attention_type: 'mention',
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
 
         // Create notification for the mentioned user
         const { error: notifError } = await supabaseAdmin
-          .from('notifications')
+          .from('TODOAAPP.notifications')
           .insert({
             user_id: mentionedUserId,
             type: 'mention',
@@ -320,7 +320,7 @@ export async function POST(request: NextRequest) {
     // ===== REGULAR COMMENT NOTIFICATIONS =====
     // Notify other project members about the comment (excluding commenter and already-mentioned users)
     const { data: projectMembers } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('user_id')
       .eq('project_id', project_id)
       .neq('user_id', user.id)
@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
         }))
 
         const { error: notifError } = await supabaseAdmin
-          .from('notifications')
+          .from('TODOAAPP.notifications')
           .insert(notifications)
 
         if (notifError) {
@@ -389,7 +389,7 @@ export async function DELETE(request: NextRequest) {
 
     // Get the comment to verify ownership
     const { data: comment } = await supabaseAdmin
-      .from('comments')
+      .from('TODOAAPP.comments')
       .select('created_by, project_id')
       .eq('id', id)
       .single()
@@ -403,7 +403,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!isAuthor) {
       const { data: membership } = await supabaseAdmin
-        .from('project_members')
+        .from('TODOAAPP.project_members')
         .select('role')
         .eq('project_id', comment.project_id)
         .eq('user_id', user.id)
@@ -418,19 +418,19 @@ export async function DELETE(request: NextRequest) {
 
     // Delete related mentions (cascade should handle this if FK is set, but be explicit)
     await supabaseAdmin
-      .from('mentions')
+      .from('TODOAAPP.mentions')
       .delete()
       .eq('comment_id', id)
 
     // Delete related attention items
     await supabaseAdmin
-      .from('attention_items')
+      .from('TODOAAPP.attention_items')
       .delete()
       .eq('comment_id', id)
 
     // Delete the comment
     const { error } = await supabaseAdmin
-      .from('comments')
+      .from('TODOAAPP.comments')
       .delete()
       .eq('id', id)
 
@@ -467,7 +467,7 @@ export async function PATCH(request: NextRequest) {
 
     // Get the existing comment
     const { data: existingComment } = await supabaseAdmin
-      .from('comments')
+      .from('TODOAAPP.comments')
       .select('created_by, project_id, task_id, content')
       .eq('id', id)
       .single()
@@ -490,7 +490,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update the comment
     const { data: updatedComment, error: updateError } = await supabaseAdmin
-      .from('comments')
+      .from('TODOAAPP.comments')
       .update({ content: content.trim(), updated_at: new Date().toISOString() })
       .eq('id', id)
       .select(`
@@ -516,19 +516,19 @@ export async function PATCH(request: NextRequest) {
 
       // Get task and project info for notifications
       const { data: task } = await supabaseAdmin
-        .from('tasks')
+        .from('TODOAAPP.tasks')
         .select('title')
         .eq('id', existingComment.task_id)
         .single()
 
       const { data: project } = await supabaseAdmin
-        .from('projects')
+        .from('TODOAAPP.projects')
         .select('name')
         .eq('id', existingComment.project_id)
         .single()
 
       const { data: commenterProfile } = await supabaseAdmin
-        .from('profiles')
+        .from('TODOAAPP.profiles')
         .select('full_name')
         .eq('id', user.id)
         .single()
@@ -541,7 +541,7 @@ export async function PATCH(request: NextRequest) {
         if (mentionedUserId === user.id) continue
 
         // Create mention record
-        await supabaseAdmin.from('mentions').insert({
+        await supabaseAdmin.from('TODOAAPP.mentions').insert({
           mentioned_user_id: mentionedUserId,
           mentioner_user_id: user.id,
           task_id: existingComment.task_id,
@@ -551,7 +551,7 @@ export async function PATCH(request: NextRequest) {
         })
 
         // Create attention item
-        await supabaseAdmin.from('attention_items').insert({
+        await supabaseAdmin.from('TODOAAPP.attention_items').insert({
           user_id: mentionedUserId,
           attention_type: 'mention',
           priority: 'high',
@@ -565,7 +565,7 @@ export async function PATCH(request: NextRequest) {
         })
 
         // Create notification
-        await supabaseAdmin.from('notifications').insert({
+        await supabaseAdmin.from('TODOAAPP.notifications').insert({
           user_id: mentionedUserId,
           type: 'mention',
           title: 'You were mentioned',

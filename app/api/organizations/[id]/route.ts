@@ -54,7 +54,7 @@ export async function GET(
 
     // Check if user is a member of this organization
     const { data: membership, error: membershipError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -66,7 +66,7 @@ export async function GET(
 
     // Fetch organization details
     const { data: organization, error: orgError } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .select('*')
       .eq('id', organizationId)
       .single()
@@ -77,7 +77,7 @@ export async function GET(
 
     // Fetch all organization members
     const { data: membersData, error: membersError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('id, user_id, role, joined_at')
       .eq('organization_id', organizationId)
       .order('joined_at', { ascending: true })
@@ -88,7 +88,7 @@ export async function GET(
 
     // Fetch all teams in this organization
     const { data: orgTeams } = await supabaseAdmin
-      .from('teams')
+      .from('TODOAAPP.teams')
       .select('id')
       .eq('organization_id', organizationId)
 
@@ -99,7 +99,7 @@ export async function GET(
     let projectIds: string[] = []
     if (teamIds.length > 0) {
       const { data: teamProjects } = await supabaseAdmin
-        .from('projects')
+        .from('TODOAAPP.projects')
         .select('id, name')
         .in('team_id', teamIds)
 
@@ -109,7 +109,7 @@ export async function GET(
 
     // Also fetch projects directly in this organization (without team)
     const { data: directProjects } = await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('id, name')
       .eq('organization_id', organizationId)
 
@@ -124,7 +124,7 @@ export async function GET(
     let projectMembers: any[] = []
     if (allProjectIds.length > 0) {
       const { data: projMembers } = await supabaseAdmin
-        .from('project_members')
+        .from('TODOAAPP.project_members')
         .select('id, user_id, role, joined_at, project_id')
         .in('project_id', allProjectIds)
 
@@ -172,7 +172,7 @@ export async function GET(
     let members: any[] = []
     if (allUserIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
-        .from('profiles')
+        .from('TODOAAPP.profiles')
         .select('id, full_name, email, avatar_url')
         .in('id', allUserIds)
 
@@ -208,7 +208,7 @@ export async function GET(
         // Fetch author profiles
         const authorIds = [...new Set(announcementsData.map(a => a.created_by))]
         const { data: authorProfiles } = await supabaseAdmin
-          .from('profiles')
+          .from('TODOAAPP.profiles')
           .select('*')
           .in('id', authorIds)
 
@@ -276,7 +276,7 @@ export async function PATCH(
 
     // Check if user has admin/owner permissions
     const { data: membership, error: membershipError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -306,7 +306,7 @@ export async function PATCH(
     }
 
     const { data: updatedOrg, error: updateError } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .update(updateData)
       .eq('id', organizationId)
       .select()
@@ -345,7 +345,7 @@ export async function DELETE(
 
     // Check if user is the owner of this organization
     const { data: membership, error: membershipError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -361,7 +361,7 @@ export async function DELETE(
 
     // Get organization details for logging
     const { data: organization } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .select('name, slug')
       .eq('id', organizationId)
       .single()
@@ -387,25 +387,25 @@ export async function DELETE(
 
     // 4. Delete notifications related to this org
     await supabaseAdmin
-      .from('notifications')
+      .from('TODOAAPP.notifications')
       .delete()
       .eq('organization_id', organizationId)
 
     // 5. Delete organization members
     await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .delete()
       .eq('organization_id', organizationId)
 
     // 6. Update projects to remove organization reference (don't delete projects)
     await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .update({ organization_id: null })
       .eq('organization_id', organizationId)
 
     // 7. Finally, delete the organization itself
     const { error: deleteError } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .delete()
       .eq('id', organizationId)
 

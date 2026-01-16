@@ -55,7 +55,7 @@ export async function POST(
 
     // Check if user is admin/owner
     const { data: membership } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -78,7 +78,7 @@ export async function POST(
 
     // Find user by email
     const { data: targetUser } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('id, email')
       .eq('email', email.trim().toLowerCase())
       .single()
@@ -89,7 +89,7 @@ export async function POST(
 
     // Check if already a member
     const { data: existingMember } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('id')
       .eq('organization_id', organizationId)
       .eq('user_id', targetUser.id)
@@ -101,7 +101,7 @@ export async function POST(
 
     // Add member
     const { data: newMember, error } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .insert({
         organization_id: organizationId,
         user_id: targetUser.id,
@@ -117,13 +117,13 @@ export async function POST(
 
     // Create notification for the invited user
     const { data: orgData } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .select('name')
       .eq('id', organizationId)
       .single()
 
     const { data: inviterProfile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('full_name, email')
       .eq('id', user.id)
       .single()
@@ -133,7 +133,7 @@ export async function POST(
 
     // Get invited user's name
     const { data: invitedProfile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('full_name, email')
       .eq('id', targetUser.id)
       .single()
@@ -142,7 +142,7 @@ export async function POST(
 
     // Notify the invited user
     await supabaseAdmin
-      .from('notifications')
+      .from('TODOAAPP.notifications')
       .insert({
         user_id: targetUser.id,
         type: 'organization_invite',
@@ -158,7 +158,7 @@ export async function POST(
 
     // Get organization owner to notify them (if they didn't do the inviting)
     const { data: ownerMember } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('user_id')
       .eq('organization_id', organizationId)
       .eq('role', 'owner')
@@ -166,7 +166,7 @@ export async function POST(
 
     if (ownerMember && ownerMember.user_id !== user.id) {
       await supabaseAdmin
-        .from('notifications')
+        .from('TODOAAPP.notifications')
         .insert({
           user_id: ownerMember.user_id,
           type: 'member_added',
@@ -226,7 +226,7 @@ export async function DELETE(
 
     // Check if user is admin/owner
     const { data: membership } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('role')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
@@ -238,7 +238,7 @@ export async function DELETE(
 
     // Get the member to be removed
     const { data: memberToRemove } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('user_id, role')
       .eq('id', memberId)
       .eq('organization_id', organizationId)
@@ -255,7 +255,7 @@ export async function DELETE(
 
     // Get member's profile before deletion
     const { data: memberProfile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('full_name, email')
       .eq('id', memberToRemove.user_id)
       .single()
@@ -264,7 +264,7 @@ export async function DELETE(
 
     // Get organization name
     const { data: orgData } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .select('name')
       .eq('id', organizationId)
       .single()
@@ -273,7 +273,7 @@ export async function DELETE(
 
     // Get remover's profile
     const { data: removerProfile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('full_name, email')
       .eq('id', user.id)
       .single()
@@ -282,7 +282,7 @@ export async function DELETE(
 
     // Delete the member
     const { error } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .delete()
       .eq('id', memberId)
 

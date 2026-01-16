@@ -54,7 +54,7 @@ export async function GET(
 
     // Verify user is a member of the project
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -66,7 +66,7 @@ export async function GET(
 
     // Get Slack integration
     const { data: integration, error } = await supabaseAdmin
-      .from('slack_integrations')
+      .from('TODOAAPP.slack_integrations')
       .select('*')
       .eq('project_id', projectId)
       .single()
@@ -126,7 +126,7 @@ export async function POST(
 
     // Verify user is an admin or owner of the project
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -206,7 +206,7 @@ export async function POST(
 
     // Upsert the integration
     const { data: integration, error } = await supabaseAdmin
-      .from('slack_integrations')
+      .from('TODOAAPP.slack_integrations')
       .upsert({
         project_id: projectId,
         access_token,
@@ -255,7 +255,7 @@ export async function DELETE(
 
     // Verify user is an admin or owner of the project
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -271,7 +271,7 @@ export async function DELETE(
 
     // Delete the integration
     const { error } = await supabaseAdmin
-      .from('slack_integrations')
+      .from('TODOAAPP.slack_integrations')
       .delete()
       .eq('project_id', projectId)
 

@@ -17,7 +17,7 @@ export class MilestoneService {
     const milestonesWithTasks = await Promise.all(
       (milestones || []).map(async (milestone) => {
         const { data: tasks, error: tasksError } = await supabase
-          .from('tasks')
+          .from('TODOAAPP.tasks')
           .select('id, stage_id, approval_status')
           .eq('milestone_id', milestone.id)
 
@@ -61,7 +61,7 @@ export class MilestoneService {
 
     // Get task counts
     const { data: tasks } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id, stage_id, approval_status')
       .eq('milestone_id', milestoneId)
 
@@ -146,7 +146,7 @@ export class MilestoneService {
   static async deleteMilestone(milestoneId: string): Promise<void> {
     // First, unlink any tasks from this milestone
     await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .update({ milestone_id: null })
       .eq('milestone_id', milestoneId)
 
@@ -177,7 +177,7 @@ export class MilestoneService {
    */
   static async linkTaskToMilestone(taskId: string, milestoneId: string | null): Promise<void> {
     const { error } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .update({ milestone_id: milestoneId })
       .eq('id', taskId)
 
@@ -189,7 +189,7 @@ export class MilestoneService {
    */
   static async getMilestoneTasks(milestoneId: string) {
     const { data, error } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('*')
       .eq('milestone_id', milestoneId)
       .order('position', { ascending: true })

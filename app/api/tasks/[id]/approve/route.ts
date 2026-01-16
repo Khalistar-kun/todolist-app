@@ -54,7 +54,7 @@ export async function POST(
 
     // Get task info
     const { data: task, error: taskError } = await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id, title, project_id, stage_id, approval_status')
       .eq('id', taskId)
       .single()
@@ -80,7 +80,7 @@ export async function POST(
 
     // Check if user is owner/admin of the project
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', task.project_id)
       .eq('user_id', user.id)
@@ -95,7 +95,7 @@ export async function POST(
 
     // Approve the task
     const { data: updatedTask, error: updateError } = await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .update({
         approval_status: 'approved',
         approved_at: new Date().toISOString(),
@@ -152,7 +152,7 @@ export async function DELETE(
 
     // Get task info
     const { data: task, error: taskError } = await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id, title, project_id, stage_id, approval_status')
       .eq('id', taskId)
       .single()
@@ -171,7 +171,7 @@ export async function DELETE(
 
     // Check if user is owner/admin of the project
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', task.project_id)
       .eq('user_id', user.id)
@@ -186,7 +186,7 @@ export async function DELETE(
 
     // Reject the task and move it back to the specified stage
     const { data: updatedTask, error: updateError } = await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .update({
         approval_status: 'rejected',
         rejection_reason: reason || null,
@@ -234,7 +234,7 @@ async function sendSlackApprovalNotification(
 ) {
   // Get project Slack integration
   const { data: integration } = await supabase
-    .from('slack_integrations')
+    .from('TODOAAPP.slack_integrations')
     .select('webhook_url, channel_id, access_token')
     .eq('project_id', projectId)
     .eq('is_active', true)
@@ -246,14 +246,14 @@ async function sendSlackApprovalNotification(
 
   // Get project name
   const { data: project } = await supabase
-    .from('projects')
+    .from('TODOAAPP.projects')
     .select('name')
     .eq('id', projectId)
     .single()
 
   // Get user who performed the action
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('TODOAAPP.profiles')
     .select('full_name, email')
     .eq('id', userId)
     .single()

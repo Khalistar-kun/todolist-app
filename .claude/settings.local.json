@@ -43,7 +43,11 @@
       "Bash(npm ls:*)",
       "Bash(npx eslint:*)",
       "Bash(ls:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(npx supabase:*)",
+      "Bash(timeout /t 3)",
+      "Bash(timeout 10 tail:*)",
+      "Bash(exit 0)"
     ]
   }
 }

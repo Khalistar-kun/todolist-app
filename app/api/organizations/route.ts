@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's organization memberships
     const { data: memberships, error: membershipError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('organization_id, role')
       .eq('user_id', user.id)
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch organizations
     const { data: organizations, error: orgsError } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .select('*')
       .in('id', orgIds)
       .order('created_at', { ascending: false })
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     let counter = 1
     while (true) {
       const { data: existing } = await supabaseAdmin
-        .from('organizations')
+        .from('TODOAAPP.organizations')
         .select('id')
         .eq('slug', slug)
         .single()
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // Create the organization
     const { data: organization, error: createError } = await supabaseAdmin
-      .from('organizations')
+      .from('TODOAAPP.organizations')
       .insert({
         name: name.trim(),
         slug,
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
 
     // Add the creator as owner
     const { error: memberError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .insert({
         organization_id: organization.id,
         user_id: user.id,
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
       console.error('[API] Error adding owner to organization:', memberError)
       // Clean up the organization
       await supabaseAdmin
-        .from('organizations')
+        .from('TODOAAPP.organizations')
         .delete()
         .eq('id', organization.id)
       return NextResponse.json({ error: 'Failed to set up organization membership' }, { status: 500 })

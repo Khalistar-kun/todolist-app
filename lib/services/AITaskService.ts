@@ -58,7 +58,7 @@ export class AITaskService {
 
     // Get project with workflow stages
     const { data: project } = await supabase
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
@@ -70,7 +70,7 @@ export class AITaskService {
     // Fetch all relevant data in parallel
     const [tasksResult, assignmentsResult, dependenciesResult] = await Promise.all([
       supabase
-        .from('tasks')
+        .from('TODOAAPP.tasks')
         .select(`
           id,
           title,
@@ -86,7 +86,7 @@ export class AITaskService {
         .neq('stage_id', doneStageId),
 
       supabase
-        .from('task_assignments')
+        .from('TODOAAPP.task_assignments')
         .select(`
           task_id,
           user_id,
@@ -263,14 +263,14 @@ export class AITaskService {
   ): Promise<TaskPrediction> {
     // Get historical completed tasks for comparison
     const { data: completedTasks } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('created_at, completed_at, priority, estimated_hours')
       .eq('project_id', projectId)
       .not('completed_at', 'is', null)
       .limit(100)
 
     const { data: task } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('priority, estimated_hours, created_at')
       .eq('id', taskId)
       .single()
@@ -328,7 +328,7 @@ export class AITaskService {
    */
   static async getWorkloadRecommendations(projectId: string): Promise<WorkloadRecommendation[]> {
     const { data: members } = await supabase
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('user_id')
       .eq('project_id', projectId)
 
@@ -339,21 +339,21 @@ export class AITaskService {
     // Fetch profiles separately
     const memberUserIds = members.map(m => m.user_id)
     const { data: profiles } = await supabase
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('id, full_name, email')
       .in('id', memberUserIds)
 
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     const { data: assignments } = await supabase
-      .from('task_assignments')
+      .from('TODOAAPP.task_assignments')
       .select(`
         user_id,
         task:tasks (id, project_id, stage_id, estimated_hours)
       `)
 
     const { data: project } = await supabase
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
@@ -410,7 +410,7 @@ export class AITaskService {
     limit: number = 5
   ): Promise<Array<{ id: string; title: string; similarity: number }>> {
     const { data: tasks } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id, title')
       .eq('project_id', projectId)
       .limit(200)
@@ -459,7 +459,7 @@ export class AITaskService {
 
     // Get project data for AI analysis
     const { data: project } = await supabase
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('workflow_stages')
       .eq('id', projectId)
       .single()
@@ -469,7 +469,7 @@ export class AITaskService {
     )?.id || 'done'
 
     const { data: tasks } = await supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id, title, status, priority, due_date, stage_id')
       .eq('project_id', projectId)
       .neq('stage_id', doneStageId)

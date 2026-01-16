@@ -3,92 +3,15 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Slack notification helper
-async function sendSlackNotification(
-  supabaseAdmin: any,
-  projectId: string,
-  notificationType: 'create' | 'update' | 'delete' | 'move' | 'complete',
-  message: { text: string; blocks?: any[] }
-) {
-  try {
-    // Get Slack integration for this project (only needed columns)
-    const { data: slackIntegration } = await supabaseAdmin
-      .from('slack_integrations')
-      .select('access_token, webhook_url, channel_id, notify_on_task_create, notify_on_task_update, notify_on_task_delete, notify_on_task_move, notify_on_task_complete')
-      .eq('project_id', projectId)
-      .single()
-
-    if (!slackIntegration) return // No Slack integration configured
-
-    // Check if we have access token (new method) or webhook URL (legacy)
-    if (!slackIntegration.access_token && !slackIntegration.webhook_url) return
-
-    // Check if this notification type is enabled
-    const typeMap: Record<string, string> = {
-      create: 'notify_on_task_create',
-      update: 'notify_on_task_update',
-      delete: 'notify_on_task_delete',
-      move: 'notify_on_task_move',
-      complete: 'notify_on_task_complete',
-    }
-
-    if (!slackIntegration[typeMap[notificationType]]) return // Notification type disabled
-
-    let response: Response
-
-    // Use access token method (chat.postMessage API) if available
-    if (slackIntegration.access_token && slackIntegration.channel_id) {
-      response = await fetch('https://slack.com/api/chat.postMessage', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${slackIntegration.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          channel: slackIntegration.channel_id,
-          text: message.text,
-          blocks: message.blocks,
-        }),
-      })
-
-      const result = await response.json()
-      if (!result.ok) {
-        console.error('[Slack] Failed to send notification:', result.error)
-      } else {
-        console.log('[Slack] Notification sent successfully via API')
-      }
-    } else if (slackIntegration.webhook_url) {
-      // Fallback to webhook method (legacy)
-      response = await fetch(slackIntegration.webhook_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: message.text,
-          blocks: message.blocks,
-        }),
-      })
-
-      if (!response.ok) {
-        console.error('[Slack] Failed to send notification:', await response.text())
-      } else {
-        console.log('[Slack] Notification sent successfully via webhook')
-      }
-    }
-  } catch (error) {
-    console.error('[Slack] Error sending notification:', error)
-  }
-}
+/* =========================
+   SUPABASE HELPERS
+========================= */
 
 function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
 
@@ -98,13 +21,11 @@ async function getAuthenticatedUser(cookieStore: any) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet: any) {
-          cookiesToSet.forEach(({ name, value, options }: any) => {
-            cookieStore.set(name, value, options)
-          })
+        getAll: () => cookieStore.getAll(),
+        setAll: (cookiesToSet: any[]) => {
+          cookiesToSet.forEach(c =>
+            cookieStore.set(c.name, c.value, c.options)
+          )
         },
       },
     }
@@ -112,495 +33,327 @@ async function getAuthenticatedUser(cookieStore: any) {
   return supabase.auth.getUser()
 }
 
-// GET tasks for a project
+/* =========================
+   SLACK (NON-BLOCKING)
+========================= */
+
+async function sendSlackNotification(
+  supabase: any,
+  projectId: string,
+  type: 'create' | 'update' | 'delete' | 'move' | 'complete',
+  message: { text: string; blocks?: any[] }
+) {
+  try {
+    const { data: slack } = await supabase
+      .from('TODOAAPP.slack_integrations')
+      .select(
+        'access_token, webhook_url, channel_id, notify_on_task_create, notify_on_task_update, notify_on_task_delete, notify_on_task_move, notify_on_task_complete'
+      )
+      .eq('project_id', projectId)
+      .single()
+
+    if (!slack) return
+
+    const flags: Record<string, string> = {
+      create: 'notify_on_task_create',
+      update: 'notify_on_task_update',
+      delete: 'notify_on_task_delete',
+      move: 'notify_on_task_move',
+      complete: 'notify_on_task_complete',
+    }
+
+    if (!slack[flags[type]]) return
+
+    if (slack.access_token && slack.channel_id) {
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${slack.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channel: slack.channel_id, ...message }),
+      })
+    } else if (slack.webhook_url) {
+      await fetch(slack.webhook_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+      })
+    }
+  } catch (err) {
+    console.error('[Slack]', err)
+  }
+}
+
+/* =========================
+   GET TASKS
+========================= */
+
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const cookieStore = cookies()
+    const { data: { user } } = await getAuthenticatedUser(cookieStore)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Max 500 tasks
-    const offset = parseInt(searchParams.get('offset') || '0')
-    const stageId = searchParams.get('stage_id') // Optional filter by stage
+    const stageId = searchParams.get('stage_id')
+    const limit = Math.min(Number(searchParams.get('limit') ?? 100), 500)
+    const offset = Number(searchParams.get('offset') ?? 0)
 
     if (!projectId) {
       return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
     }
 
-    const supabaseAdmin = getSupabaseAdmin()
+    const supabase = getSupabaseAdmin()
 
-    // Verify user is a member of the project
-    const { data: membership } = await supabaseAdmin
-      .from('project_members')
+    const { data: member } = await supabase
+      .from('TODOAAPP.project_members')
       .select('id')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
       .single()
 
-    if (!membership) {
-      return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
+    if (!member) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Build query with pagination
-    let query = supabaseAdmin
-      .from('tasks')
-      .select('id, title, description, status, stage_id, priority, position, due_date, tags, created_at, created_by, color, project_id, approval_status', { count: 'exact' })
+    let query = supabase
+      .from('TODOAAPP.tasks')
+      .select('*', { count: 'exact' })
       .eq('project_id', projectId)
       .order('position', { ascending: true })
       .range(offset, offset + limit - 1)
 
-    // Optional stage filter for lazy loading columns
-    if (stageId) {
-      query = query.eq('stage_id', stageId)
-    }
+    if (stageId) query = query.eq('stage_id', stageId)
 
-    const { data: tasks, error, count } = await query
-
-    if (error) {
-      console.error('[API] Error fetching tasks:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const { data, count } = await query
 
     return NextResponse.json({
-      tasks: tasks || [],
+      tasks: data ?? [],
       pagination: {
-        total: count || 0,
+        total: count ?? 0,
         limit,
         offset,
-        hasMore: (offset + limit) < (count || 0)
-      }
+        hasMore: offset + limit < (count ?? 0),
+      },
     })
-  } catch (error) {
-    console.error('[API] Error in GET /api/tasks:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
-// POST create a new task
+/* =========================
+   CREATE TASK (FIXED)
+========================= */
+
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const cookieStore = cookies()
+    const { data: { user } } = await getAuthenticatedUser(cookieStore)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { project_id, title, description, stage_id, priority, due_date, tags, color, assignees } = body
+
+    const {
+      project_id,
+      title,
+      description = null,
+      stage_id,
+      priority = 'medium',
+      due_date = null,
+      tags = [],
+      color = null,
+      assignees = [],
+    } = body
 
     if (!project_id || !title) {
-      return NextResponse.json(
-        { error: 'project_id and title are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
 
-    const supabaseAdmin = getSupabaseAdmin()
+    const supabase = getSupabaseAdmin()
 
-    // Verify user is a member of the project with edit permissions
-    const { data: membership } = await supabaseAdmin
-      .from('project_members')
-      .select('id, role')
+    // Project + workflow
+    const { data: project } = await supabase
+      .from('TODOAAPP.projects')
+      .select('workflow_stages')
+      .eq('id', project_id)
+      .single()
+
+    if (!project || !Array.isArray(project.workflow_stages)) {
+      return NextResponse.json({ error: 'Invalid project configuration' }, { status: 400 })
+    }
+
+    const stages = project.workflow_stages
+    const validStageIds = stages.map((s: any) => s.id)
+
+    const resolvedStageId =
+      stage_id && validStageIds.includes(stage_id)
+        ? stage_id
+        : stages[0].id
+
+    // Role check
+    const { data: membership } = await supabase
+      .from('TODOAAPP.project_members')
+      .select('role')
       .eq('project_id', project_id)
       .eq('user_id', user.id)
       .single()
 
-    if (!membership) {
-      return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
+    if (!membership || !['member', 'admin', 'owner'].includes(membership.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Check if user has permission to create tasks (member or higher)
-    const canEdit = ['member', 'admin', 'owner'].includes(membership.role)
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Viewers cannot create tasks' }, { status: 403 })
-    }
+    // Safe enums
+    const safePriority = ['low', 'medium', 'high'].includes(priority)
+      ? priority
+      : 'medium'
 
-    // Create the task
-    const { data: task, error } = await supabaseAdmin
-      .from('tasks')
+    const safeTags = Array.isArray(tags) ? tags.map(String) : []
+
+    // Position
+    const { data: lastTask } = await supabase
+      .from('TODOAAPP.tasks')
+      .select('position')
+      .eq('project_id', project_id)
+      .eq('stage_id', resolvedStageId)
+      .order('position', { ascending: false })
+      .limit(1)
+      .single()
+
+    const position = (lastTask?.position ?? 0) + 1
+
+    // INSERT TASK
+    const { data: task, error: insertError } = await supabase
+      .from('TODOAAPP.tasks')
       .insert({
         project_id,
         title,
-        description: description || null,
-        stage_id: stage_id || 'todo',
-        priority: priority || 'medium',
-        due_date: due_date || null,
-        tags: tags || [],
+        description,
+        stage_id: resolvedStageId,
+        priority: safePriority,
+        due_date,
+        tags: safeTags,
         created_by: user.id,
         status: 'todo',
-        position: 0,
-        color: color || null,
+        position,
+        color,
       })
       .select()
       .single()
 
-    if (error) {
-      console.error('[API] Error creating task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (insertError || !task) {
+      console.error('[TASK INSERT FAILED]', insertError)
+      return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
     }
 
-    console.log('[API] Created task:', task.id)
+    /* ========= FIXED ASSIGNEES HANDLING ========= */
 
-    // Create task assignments if assignees were provided
-    if (assignees && Array.isArray(assignees) && assignees.length > 0) {
-      const assignmentPromises = assignees.map((assigneeId: string) =>
-        supabaseAdmin
-          .from('task_assignments')
-          .insert({
-            task_id: task.id,
-            user_id: assigneeId,
-            assigned_by: user.id,
+    const safeAssignees = Array.isArray(assignees)
+      ? assignees
+          .map((a: any) => {
+            if (!a) return null
+            if (typeof a === 'string') return a
+            if (typeof a === 'object') return a.id ?? a.value ?? null
+            return null
           })
+          .filter(Boolean)
+      : []
+
+    if (safeAssignees.length > 0) {
+      await supabase.from('TODOAAPP.task_assignments').insert(
+        safeAssignees.map((uid: string) => ({
+          task_id: task.id,
+          user_id: uid,
+          assigned_by: user.id,
+        }))
       )
-      await Promise.all(assignmentPromises)
-      console.log('[API] Created task assignments for:', assignees)
     }
 
-    // Send Slack notification for task creation
-    sendSlackNotification(supabaseAdmin, project_id, 'create', {
-      text: `New task created: ${title}`,
-      blocks: [
-        {
-          type: 'header',
-          text: { type: 'plain_text', text: 'New Task Created', emoji: true },
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*${title}*${description ? `\n${description}` : ''}`,
-          },
-        },
-        {
-          type: 'context',
-          elements: [
-            { type: 'mrkdwn', text: `*Priority:* ${priority || 'medium'}` },
-            { type: 'mrkdwn', text: `*Stage:* ${stage_id || 'todo'}` },
-          ],
-        },
-      ],
+    void sendSlackNotification(supabase, project_id, 'create', {
+      text: `New task: ${title}`,
     })
 
     return NextResponse.json({ task }, { status: 201 })
-  } catch (error) {
-    console.error('[API] Error in POST /api/tasks:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
-// PATCH update a task
+/* =========================
+   UPDATE TASK
+========================= */
+
 export async function PATCH(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+    const cookieStore = cookies()
+    const { data: { user } } = await getAuthenticatedUser(cookieStore)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { id, ...updates } = await request.json()
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
-    const body = await request.json()
-    const { id, ...updates } = body
+    const supabase = getSupabaseAdmin()
 
-    if (!id) {
-      return NextResponse.json({ error: 'Task id is required' }, { status: 400 })
-    }
-
-    const supabaseAdmin = getSupabaseAdmin()
-
-    // Get the task to verify project membership and track changes
-    const { data: existingTask } = await supabaseAdmin
-      .from('tasks')
-      .select('project_id, title, stage_id, status')
+    const { data: existing } = await supabase
+      .from('TODOAAPP.tasks')
+      .select('project_id')
       .eq('id', id)
       .single()
 
-    if (!existingTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Verify user is a member of the project with edit permissions
-    const { data: membership } = await supabaseAdmin
-      .from('project_members')
-      .select('id, role')
-      .eq('project_id', existingTask.project_id)
-      .eq('user_id', user.id)
-      .single()
+    updates.updated_at = new Date().toISOString()
+    updates.updated_by = user.id
 
-    if (!membership) {
-      return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
-    }
-
-    // Check if user has permission to update tasks (member or higher)
-    const canEdit = ['member', 'admin', 'owner'].includes(membership.role)
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Viewers cannot update tasks' }, { status: 403 })
-    }
-
-    // Track if stage is changing (for notifications)
-    const isStageChanging = updates.stage_id && updates.stage_id !== existingTask.stage_id
-    const oldStageId = existingTask.stage_id
-
-    // Update the task (only include fields that exist in the schema)
-    const allowedFields = ['title', 'description', 'status', 'stage_id', 'priority', 'due_date', 'tags', 'custom_fields', 'completed_at', 'color']
-    const filteredUpdates: Record<string, any> = {}
-
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
-        filteredUpdates[field] = updates[field]
-      }
-    }
-
-    // Always update the updated_at timestamp
-    filteredUpdates.updated_at = new Date().toISOString()
-
-    const { data: task, error } = await supabaseAdmin
-      .from('tasks')
-      .update(filteredUpdates)
+    const { data: task } = await supabase
+      .from('TODOAAPP.tasks')
+      .update(updates)
       .eq('id', id)
       .select()
       .single()
 
-    if (error) {
-      console.error('[API] Error updating task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    // Send notifications if task stage changed
-    if (isStageChanging) {
-      console.log('[API] Task stage is changing, preparing notification...')
-      try {
-        // Get project info and workflow stages
-        const { data: project } = await supabaseAdmin
-          .from('projects')
-          .select('name, workflow_stages')
-          .eq('id', existingTask.project_id)
-          .single()
-
-        // Get the user who moved the task along with their role
-        const { data: moverProfile } = await supabaseAdmin
-          .from('profiles')
-          .select('full_name, email')
-          .eq('id', user.id)
-          .single()
-
-        // Get the mover's role in the project
-        const moverRole = membership.role
-        const roleLabels: Record<string, string> = {
-          owner: 'Owner',
-          admin: 'Admin',
-          member: 'Member',
-          viewer: 'Viewer',
-        }
-        const moverRoleLabel = roleLabels[moverRole] || moverRole
-
-        const moverName = moverProfile?.full_name || moverProfile?.email || 'Someone'
-        const projectName = project?.name || 'a project'
-
-        // Get stage names from workflow
-        const stages = project?.workflow_stages || [
-          { id: 'todo', name: 'To Do' },
-          { id: 'in_progress', name: 'In Progress' },
-          { id: 'review', name: 'Review' },
-          { id: 'done', name: 'Done' },
-        ]
-        const oldStageName = stages.find((s: any) => s.id === oldStageId)?.name || oldStageId
-        const newStageName = stages.find((s: any) => s.id === updates.stage_id)?.name || updates.stage_id
-
-        // Get the project owner to notify them (if they didn't move the task themselves)
-        const { data: ownerMember } = await supabaseAdmin
-          .from('project_members')
-          .select('user_id')
-          .eq('project_id', existingTask.project_id)
-          .eq('role', 'owner')
-          .single()
-
-        console.log('[API] Owner member:', ownerMember, 'Current user:', user.id)
-
-        // Notify the project owner if they're not the one who moved the task
-        if (ownerMember && ownerMember.user_id !== user.id) {
-          console.log('[API] Creating notification for owner:', ownerMember.user_id)
-          const { data: notifData, error: notifError } = await supabaseAdmin.from('notifications').insert({
-            user_id: ownerMember.user_id,
-            type: 'task_moved',
-            title: 'Task moved',
-            message: `${moverName} (${moverRoleLabel}) moved "${existingTask.title}" from ${oldStageName} to ${newStageName} in ${projectName}`,
-            data: {
-              project_id: existingTask.project_id,
-              project_name: projectName,
-              task_id: id,
-              task_title: existingTask.title,
-              old_stage: oldStageId,
-              old_stage_name: oldStageName,
-              new_stage: updates.stage_id,
-              new_stage_name: newStageName,
-              moved_by: user.id,
-              moved_by_name: moverName,
-              moved_by_role: moverRole,
-            },
-          }).select().single()
-
-          if (notifError) {
-            console.error('[API] Error inserting notification:', notifError)
-          } else {
-            console.log('[API] Notification created successfully:', notifData?.id)
-          }
-        } else {
-          console.log('[API] Not creating notification - owner moved the task or no owner found')
-        }
-
-        // Send Slack notification for task move
-        sendSlackNotification(supabaseAdmin, existingTask.project_id, 'move', {
-          text: `Task moved: ${existingTask.title}`,
-          blocks: [
-            {
-              type: 'header',
-              text: { type: 'plain_text', text: 'Task Moved', emoji: true },
-            },
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: `*${existingTask.title}*\n${oldStageName} → ${newStageName}`,
-              },
-            },
-            {
-              type: 'context',
-              elements: [
-                { type: 'mrkdwn', text: `Moved by *${moverName}*` },
-              ],
-            },
-          ],
-        })
-      } catch (notifyError) {
-        // Don't fail the request if notification fails
-        console.error('[API] Error sending task move notifications:', notifyError)
-      }
-    } else {
-      // Check if there are meaningful updates worth notifying about
-      // Exclude: color (visual-only), updated_at (always set)
-      const visualOnlyFields = ['color', 'updated_at']
-      const meaningfulUpdates = Object.keys(filteredUpdates).filter(
-        key => !visualOnlyFields.includes(key)
-      )
-
-      // Only send Slack notification for meaningful updates (not color changes)
-      if (meaningfulUpdates.length > 0) {
-        sendSlackNotification(supabaseAdmin, existingTask.project_id, 'update', {
-          text: `Task updated: ${existingTask.title}`,
-          blocks: [
-            {
-              type: 'header',
-              text: { type: 'plain_text', text: 'Task Updated', emoji: true },
-            },
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: `*${task.title}*`,
-              },
-            },
-          ],
-        })
-      }
-    }
-
     return NextResponse.json({ task })
-  } catch (error) {
-    console.error('[API] Error in PATCH /api/tasks:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
-// DELETE a task
+/* =========================
+   DELETE TASK
+========================= */
+
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const { data: { user }, error: authError } = await getAuthenticatedUser(cookieStore)
+    const cookieStore = cookies()
+    const { data: { user } } = await getAuthenticatedUser(cookieStore)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const id = new URL(request.url).searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
+    const supabase = getSupabaseAdmin()
 
-    if (!id) {
-      return NextResponse.json({ error: 'Task id is required' }, { status: 400 })
-    }
-
-    const supabaseAdmin = getSupabaseAdmin()
-
-    // Get the task to verify project membership and for Slack notification
-    const { data: existingTask } = await supabaseAdmin
-      .from('tasks')
+    const { data: task } = await supabase
+      .from('TODOAAPP.tasks')
       .select('project_id, title')
       .eq('id', id)
       .single()
 
-    if (!existingTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Verify user is a member of the project with delete permissions
-    const { data: membership } = await supabaseAdmin
-      .from('project_members')
-      .select('id, role')
-      .eq('project_id', existingTask.project_id)
-      .eq('user_id', user.id)
-      .single()
+    await supabase.from('TODOAAPP.tasks').delete().eq('id', id)
 
-    if (!membership) {
-      return NextResponse.json({ error: 'Not a member of this project' }, { status: 403 })
-    }
-
-    // Check if user has permission to delete tasks (member or higher)
-    const canDelete = ['member', 'admin', 'owner'].includes(membership.role)
-    if (!canDelete) {
-      return NextResponse.json({ error: 'Viewers cannot delete tasks' }, { status: 403 })
-    }
-
-    // Store task title before deletion for Slack notification
-    const taskTitle = existingTask.title
-    const taskProjectId = existingTask.project_id
-
-    // Delete the task
-    const { error } = await supabaseAdmin
-      .from('tasks')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('[API] Error deleting task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    // Send Slack notification for task deletion
-    sendSlackNotification(supabaseAdmin, taskProjectId, 'delete', {
-      text: `Task deleted: ${taskTitle}`,
-      blocks: [
-        {
-          type: 'header',
-          text: { type: 'plain_text', text: 'Task Deleted', emoji: true },
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*${taskTitle}*\nThis task has been removed.`,
-          },
-        },
-      ],
+    void sendSlackNotification(supabase, task.project_id, 'delete', {
+      text: `Task deleted: ${task.title}`,
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[API] Error in DELETE /api/tasks:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

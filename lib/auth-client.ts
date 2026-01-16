@@ -32,7 +32,7 @@ export async function signUp(email: string, password: string, fullName: string) 
 
       // Verify the profile was created by the trigger
       const { data: profile, error: profileCheckError } = await supabase
-        .from('profiles')
+        .from('TODOAAPP.profiles')
         .select('id')
         .eq('id', authData.user.id)
         .single()
@@ -45,7 +45,7 @@ export async function signUp(email: string, password: string, fullName: string) 
 
       // Create default organization for new user
       const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
+        .from('TODOAAPP.organizations')
         .insert({
           name: `${fullName}'s Workspace`,
           slug: `${fullName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
@@ -60,7 +60,7 @@ export async function signUp(email: string, password: string, fullName: string) 
       } else {
         // Add user as owner of the organization
         const { error: memberError } = await supabase
-          .from('organization_members')
+          .from('TODOAAPP.organization_members')
           .insert({
             organization_id: orgData.id,
             user_id: authData.user.id,
@@ -146,7 +146,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     // Get profile data
     let { data: profile, error } = await supabase
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('*')
       .eq('id', user.id)
       .single()
@@ -166,7 +166,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
       // Create the missing profile
       const { data: newProfile, error: createError } = await supabase
-        .from('profiles')
+        .from('TODOAAPP.profiles')
         .upsert({
           id: user.id,
           email: user.email!,
@@ -211,7 +211,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 export async function updateProfile(userId: string, updates: Partial<Profile>) {
   try {
     const { error } = await supabase
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .update(updates)
       .eq('id', userId)
 
@@ -243,7 +243,7 @@ export async function uploadAvatar(userId: string, file: File) {
 
     // Update profile with avatar URL
     const { error: updateError } = await supabase
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .update({ avatar_url: publicUrl })
       .eq('id', userId)
 

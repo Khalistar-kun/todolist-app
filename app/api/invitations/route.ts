@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's email from profile
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('email')
       .eq('id', user.id)
       .single()
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     const invitationsWithProjects = await Promise.all(
       (invitations || []).map(async (inv) => {
         const { data: project } = await supabaseAdmin
-          .from('projects')
+          .from('TODOAAPP.projects')
           .select('id, name, color')
           .eq('id', inv.project_id)
           .single()
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         let inviterProfile = null
         if (inviter?.invited_by) {
           const { data: profile } = await supabaseAdmin
-            .from('profiles')
+            .from('TODOAAPP.profiles')
             .select('full_name, email')
             .eq('id', inviter.invited_by)
             .single()
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     // Get user's email
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('TODOAAPP.profiles')
       .select('email')
       .eq('id', user.id)
       .single()
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
 
     // Accept the invitation - add user to project
     const { data: existingMember } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('id')
       .eq('project_id', invitation.project_id)
       .eq('user_id', user.id)
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
 
     // Add user to project
     const { error: memberError } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .insert({
         project_id: invitation.project_id,
         user_id: user.id,
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
 
     // Get project name for response
     const { data: project } = await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('name')
       .eq('id', invitation.project_id)
       .single()
@@ -282,7 +282,7 @@ export async function DELETE(request: NextRequest) {
 
     // Check if user has permission to cancel
     const { data: membership } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', invitation.project_id)
       .eq('user_id', user.id)

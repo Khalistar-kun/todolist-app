@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // Get teams user is a member of
     let query = supabaseAdmin
-      .from('team_members')
+      .from('TODOAAPP.team_members')
       .select(`
         team_id,
         role,
@@ -94,11 +94,11 @@ export async function GET(request: NextRequest) {
       teams.map(async (team: any) => {
         const [membersResult, projectsResult] = await Promise.all([
           supabaseAdmin
-            .from('team_members')
+            .from('TODOAAPP.team_members')
             .select('id', { count: 'exact', head: true })
             .eq('team_id', team.id),
           supabaseAdmin
-            .from('projects')
+            .from('TODOAAPP.projects')
             .select('id', { count: 'exact', head: true })
             .eq('team_id', team.id),
         ])
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     // Verify user is member of the organization
     const { data: orgMembership, error: orgError } = await supabaseAdmin
-      .from('organization_members')
+      .from('TODOAAPP.organization_members')
       .select('role')
       .eq('organization_id', organization_id)
       .eq('user_id', user.id)
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     // Create the team
     const { data: team, error: teamError } = await supabaseAdmin
-      .from('teams')
+      .from('TODOAAPP.teams')
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
 
     // Add creator as team owner
     const { error: memberError } = await supabaseAdmin
-      .from('team_members')
+      .from('TODOAAPP.team_members')
       .insert({
         team_id: team.id,
         user_id: user.id,

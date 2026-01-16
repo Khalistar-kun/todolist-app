@@ -43,7 +43,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
 
   const supabase = await createClient()
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('TODOAAPP.profiles')
     .select('*')
     .eq('id', user.id)
     .single()
@@ -66,7 +66,7 @@ export async function checkProjectMembership(
 ): Promise<ProjectRole | null> {
   const supabase = await createClient()
   const { data: member } = await supabase
-    .from('project_members')
+    .from('TODOAAPP.project_members')
     .select('role')
     .eq('user_id', userId)
     .eq('project_id', projectId)
@@ -103,7 +103,7 @@ export async function createProfile(userId: string, email: string, metadata?: an
   const supabase = await createClient()
 
   const { error } = await supabase
-    .from('profiles')
+    .from('TODOAAPP.profiles')
     .upsert({
       id: userId,
       email,
@@ -121,7 +121,7 @@ export async function updateLastSeen(userId: string): Promise<void> {
   const supabase = await createClient()
 
   const { error } = await supabase
-    .from('profiles')
+    .from('TODOAAPP.profiles')
     .update({
       last_seen_at: new Date().toISOString(),
       is_online: true
@@ -138,7 +138,7 @@ export async function getUserProjects(userId: string) {
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('project_members')
+    .from('TODOAAPP.project_members')
     .select(`
       role,
       project:projects(
@@ -227,7 +227,7 @@ export async function searchUsers(query: string, projectId?: string): Promise<Us
   const supabase = await createClient()
 
   let dbQuery = supabase
-    .from('profiles')
+    .from('TODOAAPP.profiles')
     .select('*')
     .or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
     .limit(10)
@@ -235,7 +235,7 @@ export async function searchUsers(query: string, projectId?: string): Promise<Us
   // If projectId is provided, only return project members
   if (projectId) {
     const { data: memberIds } = await supabase
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('user_id')
       .eq('project_id', projectId)
 
@@ -261,7 +261,7 @@ export async function getProjectMembers(projectId: string) {
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('project_members')
+    .from('TODOAAPP.project_members')
     .select(`
       *,
       user:profiles(
@@ -289,11 +289,11 @@ export async function getUserStats(userId: string) {
 
   const [projectsResult, tasksResult] = await Promise.all([
     supabase
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('project_id')
       .eq('user_id', userId),
     supabase
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id, status, created_at')
       .or(`created_by.eq.${userId},assigned_to.cs.{${userId}}`)
   ])

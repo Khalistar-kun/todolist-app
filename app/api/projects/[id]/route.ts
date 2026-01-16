@@ -56,14 +56,14 @@ export async function GET(
     const [projectResult, membershipResult, membersResult, taskCountsResult] = await Promise.all([
       // Get project with only needed columns
       supabaseAdmin
-        .from('projects')
+        .from('TODOAAPP.projects')
         .select('id, name, description, color, status, organization_id, workflow_stages, created_at, image_url')
         .eq('id', projectId)
         .single(),
 
       // Verify user is a member
       supabaseAdmin
-        .from('project_members')
+        .from('TODOAAPP.project_members')
         .select('id, role')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
@@ -71,13 +71,13 @@ export async function GET(
 
       // Get members (profiles will be fetched separately to avoid JOIN issues)
       supabaseAdmin
-        .from('project_members')
+        .from('TODOAAPP.project_members')
         .select('id, role, joined_at, user_id')
         .eq('project_id', projectId),
 
       // Get task stage_id and approval_status for completed count
       supabaseAdmin
-        .from('tasks')
+        .from('TODOAAPP.tasks')
         .select('stage_id, approval_status')
         .eq('project_id', projectId)
     ])
@@ -104,7 +104,7 @@ export async function GET(
     const memberProfiles = await Promise.all(
       (members || []).map(async (member) => {
         const { data: profile } = await supabaseAdmin
-          .from('profiles')
+          .from('TODOAAPP.profiles')
           .select('id, full_name, email, avatar_url')
           .eq('id', member.user_id)
           .single()
@@ -173,7 +173,7 @@ export async function PATCH(
 
     // Check if user has edit permissions (owner or admin)
     const { data: membership, error: membershipError } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -205,7 +205,7 @@ export async function PATCH(
 
     // Update the project
     const { data: updatedProject, error: updateError } = await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .update(updateData)
       .eq('id', projectId)
       .select('id, name, description, image_url, color, status, team_id')
@@ -246,7 +246,7 @@ export async function DELETE(
 
     // Check if user is the owner of this project
     const { data: membership, error: membershipError } = await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .select('role')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
@@ -262,7 +262,7 @@ export async function DELETE(
 
     // Get project details for logging
     const { data: project } = await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .select('name')
       .eq('id', projectId)
       .single()
@@ -270,7 +270,7 @@ export async function DELETE(
     // Delete related data in order (due to foreign key constraints)
     // 1. Delete task comments
     const { data: tasks } = await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .select('id')
       .eq('project_id', projectId)
 
@@ -284,7 +284,7 @@ export async function DELETE(
 
     // 2. Delete tasks
     await supabaseAdmin
-      .from('tasks')
+      .from('TODOAAPP.tasks')
       .delete()
       .eq('project_id', projectId)
 
@@ -302,19 +302,19 @@ export async function DELETE(
 
     // 5. Delete notifications related to this project
     await supabaseAdmin
-      .from('notifications')
+      .from('TODOAAPP.notifications')
       .delete()
       .eq('data->>project_id', projectId)
 
     // 6. Delete project members
     await supabaseAdmin
-      .from('project_members')
+      .from('TODOAAPP.project_members')
       .delete()
       .eq('project_id', projectId)
 
     // 7. Finally, delete the project itself
     const { error: deleteError } = await supabaseAdmin
-      .from('projects')
+      .from('TODOAAPP.projects')
       .delete()
       .eq('id', projectId)
 
