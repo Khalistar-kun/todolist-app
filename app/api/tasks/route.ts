@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single()
 
-    if (!membership || !['member', 'admin', 'owner'].includes(membership.role)) {
+    if (!membership || !['editor', 'admin', 'owner'].includes(membership.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
