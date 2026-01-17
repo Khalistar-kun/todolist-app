@@ -44,7 +44,9 @@ async function sendSlackNotification(
   message: { text: string; blocks?: any[] }
 ) {
   try {
-    const { data: slack } = await supabase
+    console.log(`[Slack] Attempting to send '${type}' notification for project: ${projectId}`)
+
+    const { data: slack, error: slackError } = await supabase
       .from('slack_integrations')
       .select(
         'access_token, webhook_url, channel_id, notify_on_task_create, notify_on_task_update, notify_on_task_delete, notify_on_task_move, notify_on_task_complete'
@@ -52,7 +54,17 @@ async function sendSlackNotification(
       .eq('project_id', projectId)
       .single()
 
-    if (!slack) return
+    if (slackError) {
+      console.log(`[Slack] No Slack integration found for project ${projectId}:`, slackError.message)
+      return
+    }
+
+    if (!slack) {
+      console.log(`[Slack] No Slack config data for project ${projectId}`)
+      return
+    }
+
+    console.log(`[Slack] Found config - has access_token: ${!!slack.access_token}, has channel_id: ${!!slack.channel_id}, has webhook_url: ${!!slack.webhook_url}`)
 
     const flags: Record<string, string> = {
       create: 'notify_on_task_create',
@@ -62,10 +74,17 @@ async function sendSlackNotification(
       complete: 'notify_on_task_complete',
     }
 
-    if (!slack[flags[type]]) return
+    const flagValue = slack[flags[type]]
+    console.log(`[Slack] Notification flag '${flags[type]}' = ${flagValue}`)
+
+    if (!flagValue) {
+      console.log(`[Slack] Notification type '${type}' is disabled for this project`)
+      return
+    }
 
     if (slack.access_token && slack.channel_id) {
-      await fetch('https://slack.com/api/chat.postMessage', {
+      console.log(`[Slack] Sending via chat.postMessage API to channel: ${slack.channel_id}`)
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${slack.access_token}`,
@@ -73,15 +92,25 @@ async function sendSlackNotification(
         },
         body: JSON.stringify({ channel: slack.channel_id, ...message }),
       })
+      const result = await response.json()
+      if (result.ok) {
+        console.log(`[Slack] Message sent successfully! ts: ${result.ts}`)
+      } else {
+        console.error(`[Slack] API error: ${result.error}`)
+      }
     } else if (slack.webhook_url) {
-      await fetch(slack.webhook_url, {
+      console.log(`[Slack] Sending via webhook URL`)
+      const response = await fetch(slack.webhook_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(message),
       })
+      console.log(`[Slack] Webhook response status: ${response.status}`)
+    } else {
+      console.log(`[Slack] No valid delivery method - missing both access_token/channel_id and webhook_url`)
     }
   } catch (err) {
-    console.error('[Slack]', err)
+    console.error('[Slack] Exception:', err)
   }
 }
 
