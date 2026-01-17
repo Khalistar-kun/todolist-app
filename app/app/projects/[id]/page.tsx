@@ -614,7 +614,8 @@ export default function ProjectPage() {
     setTasks(prev => {
       const newTasks = { ...prev }
       for (const stageId of Object.keys(newTasks)) {
-        newTasks[stageId] = newTasks[stageId].map(t =>
+        const stageTasks = newTasks[stageId] || []
+        newTasks[stageId] = stageTasks.map(t =>
           t.id === task.id ? { ...t, color } : t
         )
       }
@@ -643,7 +644,8 @@ export default function ProjectPage() {
     setTasks(prev => {
       const newTasks = { ...prev }
       for (const stageId of Object.keys(newTasks)) {
-        newTasks[stageId] = newTasks[stageId].map(t =>
+        const stageTasks = newTasks[stageId] || []
+        newTasks[stageId] = stageTasks.map(t =>
           t.id === task.id ? { ...t, approval_status: 'approved' as const, approved_at: new Date().toISOString() } : t
         )
       }
@@ -683,8 +685,9 @@ export default function ProjectPage() {
 
       // Remove from done stage
       for (const stageId of Object.keys(prev)) {
+        const stageTasks = prev[stageId] || []
         if (stageId === 'done') {
-          newTasks[stageId] = prev[stageId].filter(t => {
+          newTasks[stageId] = stageTasks.filter(t => {
             if (t.id === task.id) {
               rejectedTask = { ...t, stage_id: 'todo', approval_status: 'rejected' as const, rejection_reason: null }
               return false
@@ -692,7 +695,7 @@ export default function ProjectPage() {
             return true
           })
         } else {
-          newTasks[stageId] = [...prev[stageId]]
+          newTasks[stageId] = [...stageTasks]
         }
       }
 
