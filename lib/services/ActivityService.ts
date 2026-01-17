@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 export type ActivityType =
   | 'task_created'
   | 'task_updated'
+  | 'task_deleted'
   | 'task_completed'
   | 'task_moved'
   | 'task_assigned'
@@ -419,10 +420,21 @@ export class ActivityService {
     switch (activity.type) {
       case 'task_created':
         return `created task "${activity.task_title}"`
+      case 'task_updated':
+        const changes = activity.metadata || {}
+        const changedFields = Object.keys(changes).filter(k => k !== 'content_preview')
+        if (changedFields.length > 0) {
+          return `updated ${changedFields.join(', ')} on "${activity.task_title}"`
+        }
+        return `updated task "${activity.task_title}"`
+      case 'task_deleted':
+        return `deleted task "${activity.task_title}"`
       case 'task_completed':
         return `completed task "${activity.task_title}"`
       case 'task_moved':
-        return `moved task "${activity.task_title}"`
+        const oldStage = activity.metadata?.old_stage_name || 'Unknown'
+        const newStage = activity.metadata?.new_stage_name || 'Unknown'
+        return `moved "${activity.task_title}" from ${oldStage} to ${newStage}`
       case 'task_assigned':
         return `assigned "${activity.task_title}" to ${activity.target_user_name}`
       case 'task_unassigned':
