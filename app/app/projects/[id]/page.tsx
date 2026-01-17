@@ -163,7 +163,8 @@ export default function ProjectPage() {
     setTasks(prev => {
       const newTasks = { ...prev }
       for (const stageId of Object.keys(newTasks)) {
-        newTasks[stageId] = newTasks[stageId].map(t =>
+        const stageTasks = newTasks[stageId] || []
+        newTasks[stageId] = stageTasks.map(t =>
           t.id === updatedTask.id ? updatedTask : t
         )
       }
@@ -171,7 +172,7 @@ export default function ProjectPage() {
       if (updatedTask.stage_id !== selectedTask?.stage_id) {
         // Remove from old stage
         if (selectedTask?.stage_id) {
-          newTasks[selectedTask.stage_id] = newTasks[selectedTask.stage_id]?.filter(t => t.id !== updatedTask.id) || []
+          newTasks[selectedTask.stage_id] = (newTasks[selectedTask.stage_id] || []).filter(t => t.id !== updatedTask.id)
         }
         // Add to new stage
         if (!newTasks[updatedTask.stage_id]) {
