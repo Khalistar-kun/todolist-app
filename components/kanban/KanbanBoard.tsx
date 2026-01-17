@@ -233,6 +233,7 @@ export function KanbanBoard({
 
   // Get selected tasks
   const selectedTasks = Object.values(tasks)
+    .filter(arr => arr != null)
     .flat()
     .filter(task => selectedTaskIds.has(task.id))
 
@@ -340,6 +341,7 @@ export function KanbanBoard({
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     const task = Object.values(tasks)
+      .filter(arr => arr != null)
       .flat()
       .find((t) => t.id === active.id)
 
@@ -363,6 +365,7 @@ export function KanbanBoard({
     const overId = over.id as string
 
     const activeTask = Object.values(tasks)
+      .filter(arr => arr != null)
       .flat()
       .find((t) => t.id === activeId)
 
@@ -390,6 +393,7 @@ export function KanbanBoard({
     const overId = over.id as string
 
     const draggedTask = Object.values(tasks)
+      .filter(arr => arr != null)
       .flat()
       .find((t) => t.id === activeId)
 
@@ -422,6 +426,7 @@ export function KanbanBoard({
 
     // Check if dropped on another task
     const targetTask = Object.values(tasks)
+      .filter(arr => arr != null)
       .flat()
       .find((t) => t.id === overId)
 

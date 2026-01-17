@@ -388,7 +388,8 @@ export default function ProjectPage() {
     setTasks(prev => {
       const newTasks = { ...prev }
       for (const stageId of Object.keys(newTasks)) {
-        newTasks[stageId] = newTasks[stageId].filter(t => t.id !== task.id)
+        const stageTasks = newTasks[stageId] || []
+        newTasks[stageId] = stageTasks.filter(t => t.id !== task.id)
       }
       return newTasks
     })
@@ -506,7 +507,7 @@ export default function ProjectPage() {
         // Navigate to task or view
         if (action.payload.task_id) {
           // Find the task and open the modal
-          const allTasks = Object.values(tasks).flat()
+          const allTasks = Object.values(tasks).filter(arr => arr != null).flat()
           const task = allTasks.find(t => t.id === action.payload.task_id)
           if (task) {
             setSelectedTask(task)
@@ -542,7 +543,7 @@ export default function ProjectPage() {
       case 'reassign':
         // Open task for reassignment
         if (action.payload.task_id) {
-          const allTasks = Object.values(tasks).flat()
+          const allTasks = Object.values(tasks).filter(arr => arr != null).flat()
           const task = allTasks.find(t => t.id === action.payload.task_id)
           if (task) {
             setSelectedTask(task)
@@ -555,7 +556,7 @@ export default function ProjectPage() {
       case 'set_due_date':
         // Open task for setting due date
         if (action.payload.task_id) {
-          const allTasks = Object.values(tasks).flat()
+          const allTasks = Object.values(tasks).filter(arr => arr != null).flat()
           const task = allTasks.find(t => t.id === action.payload.task_id)
           if (task) {
             setSelectedTask(task)
@@ -1092,7 +1093,7 @@ export default function ProjectPage() {
 
         {activeTab === 'timeline' && (
           <TimelineView
-            tasks={Object.values(tasks).flat()}
+            tasks={Object.values(tasks).filter(arr => arr != null).flat()}
             workflowStages={project.workflow_stages || []}
             onTaskClick={handleTimelineTaskClick}
           />
